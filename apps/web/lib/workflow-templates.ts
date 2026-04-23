@@ -440,7 +440,7 @@ export const PAYROLL_TEMPLATE: WorkflowTemplate = {
     { stage_n: 1, title: 'Confirm all employee hours/salaries are correct',   assigned_role: 'accountant',        due_offset_days: 1,  sort_order: 2 },
     { stage_n: 1, title: 'Verify new employees and terminations',             assigned_role: 'senior_accountant', due_offset_days: 1,  sort_order: 3 },
     { stage_n: 2, title: 'Calculate CPP contributions (employee + employer)', assigned_role: 'accountant',        due_offset_days: 2,  sort_order: 4 },
-    { stage_n: 2, title: 'Calculate EI premiums (employee + employer × 1.4)','accountant',        due_offset_days: 2,  sort_order: 5 },
+   { stage_n: 2, title: 'Calculate EI premiums (employee + employer × 1.4)', assigned_role: 'accountant',        due_offset_days: 2,  sort_order: 5 }, 
     { stage_n: 2, title: 'Calculate income tax withholding per employee',     assigned_role: 'accountant',        due_offset_days: 2,  sort_order: 6 },
     { stage_n: 3, title: 'Cross-check deductions against CRA Payroll Tables', assigned_role: 'senior_accountant', due_offset_days: 3,  sort_order: 7 },
     { stage_n: 3, title: 'Verify year-to-date CPP/EI maximums not exceeded', assigned_role: 'accountant',        due_offset_days: 3,  sort_order: 8 },
