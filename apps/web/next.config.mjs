@@ -23,6 +23,14 @@ const securityHeaders = [
 const nextConfig = {
   reactStrictMode: true,
 
+  // Skip type checking and linting during build — run separately in CI
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+
   async headers() {
     return [{ source: '/(.*)', headers: securityHeaders }]
   },
