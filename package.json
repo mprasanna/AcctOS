@@ -1,0 +1,10 @@
+{
+  "name": "acct-os",
+  "private": true,
+  "scripts": {
+    "dev":       "pnpm --filter acct-os-web dev",
+    "build":     "pnpm --filter acct-os-web build",
+    "typecheck": "pnpm --filter acct-os-web typecheck",
+    "lint":      "pnpm --filter acct-os-web lint"
+  }
+}
