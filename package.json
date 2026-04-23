@@ -1,6 +1,11 @@
 {
   "name": "acct-os",
   "private": true,
+  "packageManager": "pnpm@9.0.0",
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=9"
+  },
   "scripts": {
     "dev":       "pnpm --filter acct-os-web dev",
     "build":     "pnpm --filter acct-os-web build",
