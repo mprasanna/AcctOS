@@ -9,7 +9,7 @@
 -- ────────────────────────────────────────────────────────────
 
 CREATE TABLE firm_settings (
-  id                    uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id                    uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   firm_id               uuid NOT NULL UNIQUE REFERENCES firms(id) ON DELETE CASCADE,
 
   -- Automation rules
@@ -57,7 +57,7 @@ CREATE TRIGGER trg_firms_create_settings
 -- ────────────────────────────────────────────────────────────
 
 CREATE TABLE storage_objects (
-  id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   firm_id         uuid NOT NULL REFERENCES firms(id) ON DELETE CASCADE,
   client_id       uuid NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
   workflow_id     uuid NOT NULL REFERENCES workflows(id) ON DELETE CASCADE,
@@ -93,7 +93,7 @@ CREATE INDEX idx_storage_objects_firm      ON storage_objects(firm_id);
 -- ────────────────────────────────────────────────────────────
 
 CREATE TABLE auto_advance_log (
-  id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   firm_id         uuid NOT NULL REFERENCES firms(id) ON DELETE CASCADE,
   workflow_id     uuid NOT NULL REFERENCES workflows(id) ON DELETE CASCADE,
   stage_n         smallint NOT NULL,
@@ -115,7 +115,7 @@ CREATE INDEX idx_auto_advance_firm     ON auto_advance_log(firm_id);
 -- ────────────────────────────────────────────────────────────
 
 CREATE TABLE workflow_links (
-  id                  uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   firm_id             uuid NOT NULL REFERENCES firms(id) ON DELETE CASCADE,
   source_workflow_id  uuid NOT NULL REFERENCES workflows(id) ON DELETE CASCADE,
   source_stage_n      smallint NOT NULL,   -- when THIS stage completes on source...
@@ -136,7 +136,7 @@ CREATE INDEX idx_workflow_links_firm   ON workflow_links(firm_id);
 -- ────────────────────────────────────────────────────────────
 
 CREATE TABLE user_invitations (
-  id          uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   firm_id     uuid NOT NULL REFERENCES firms(id) ON DELETE CASCADE,
   email       text NOT NULL,
   role        user_role NOT NULL DEFAULT 'accountant',

@@ -38,7 +38,7 @@ CREATE TYPE notification_channel AS ENUM (
 -- ────────────────────────────────────────────────────────────
 
 CREATE TABLE automation_jobs (
-  id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   firm_id         uuid NOT NULL REFERENCES firms(id) ON DELETE CASCADE,
   workflow_id     uuid REFERENCES workflows(id) ON DELETE CASCADE,
   client_id       uuid REFERENCES clients(id) ON DELETE CASCADE,
@@ -82,7 +82,7 @@ CREATE TRIGGER trg_automation_jobs_updated
 -- ────────────────────────────────────────────────────────────
 
 CREATE TABLE notification_log (
-  id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   firm_id         uuid NOT NULL REFERENCES firms(id) ON DELETE CASCADE,
   job_id          uuid REFERENCES automation_jobs(id) ON DELETE SET NULL,
   workflow_id     uuid REFERENCES workflows(id) ON DELETE SET NULL,
@@ -116,7 +116,7 @@ CREATE INDEX idx_notif_resend   ON notification_log(resend_id) WHERE resend_id I
 -- ────────────────────────────────────────────────────────────
 
 CREATE TABLE gst_history (
-  id          uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   firm_id     uuid NOT NULL REFERENCES firms(id) ON DELETE CASCADE,
   client_id   uuid NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
   workflow_id uuid REFERENCES workflows(id) ON DELETE SET NULL,
@@ -145,7 +145,7 @@ CREATE INDEX idx_gst_history_period ON gst_history(client_id, deadline DESC);
 -- ────────────────────────────────────────────────────────────
 
 CREATE TABLE r2_objects (
-  id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   firm_id         uuid NOT NULL REFERENCES firms(id) ON DELETE CASCADE,
   client_id       uuid NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
   workflow_id     uuid NOT NULL REFERENCES workflows(id) ON DELETE CASCADE,

@@ -3,9 +3,6 @@
 -- firms · users · clients
 -- ============================================================
 
--- Enable UUID extension
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- ────────────────────────────────────────────────────────────
 -- ENUMS
@@ -47,7 +44,7 @@ CREATE TYPE plan_tier AS ENUM (
 -- ────────────────────────────────────────────────────────────
 
 CREATE TABLE firms (
-  id                uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   name              text NOT NULL,
   plan              plan_tier NOT NULL DEFAULT 'Starter',
   primary_email     text,
@@ -80,7 +77,7 @@ CREATE INDEX idx_users_firm ON users(firm_id);
 -- ────────────────────────────────────────────────────────────
 
 CREATE TABLE clients (
-  id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   firm_id         uuid NOT NULL REFERENCES firms(id) ON DELETE CASCADE,
   name            text NOT NULL,
   type            client_type NOT NULL,

@@ -44,7 +44,7 @@ CREATE TYPE task_status AS ENUM (
 -- ────────────────────────────────────────────────────────────
 
 CREATE TABLE workflows (
-  id                      uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id                      uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   client_id               uuid NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
   firm_id                 uuid NOT NULL REFERENCES firms(id) ON DELETE CASCADE,
   type                    workflow_type NOT NULL,
@@ -77,7 +77,7 @@ CREATE TRIGGER trg_workflows_updated
 -- ────────────────────────────────────────────────────────────
 
 CREATE TABLE stages (
-  id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   workflow_id     uuid NOT NULL REFERENCES workflows(id) ON DELETE CASCADE,
   firm_id         uuid NOT NULL REFERENCES firms(id) ON DELETE CASCADE,
   n               smallint NOT NULL CHECK (n BETWEEN 1 AND 6),
@@ -109,7 +109,7 @@ CREATE TRIGGER trg_stages_updated
 -- ────────────────────────────────────────────────────────────
 
 CREATE TABLE tasks (
-  id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   workflow_id     uuid NOT NULL REFERENCES workflows(id) ON DELETE CASCADE,
   firm_id         uuid NOT NULL REFERENCES firms(id) ON DELETE CASCADE,
   stage_n         smallint CHECK (stage_n BETWEEN 1 AND 6),

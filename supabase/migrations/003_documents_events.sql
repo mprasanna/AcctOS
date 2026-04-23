@@ -17,7 +17,7 @@ CREATE TYPE document_status AS ENUM (
 -- ────────────────────────────────────────────────────────────
 
 CREATE TABLE documents (
-  id                  uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   workflow_id         uuid NOT NULL REFERENCES workflows(id) ON DELETE CASCADE,
   client_id           uuid NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
   firm_id             uuid NOT NULL REFERENCES firms(id) ON DELETE CASCADE,
@@ -46,7 +46,7 @@ CREATE TRIGGER trg_documents_updated
 -- ────────────────────────────────────────────────────────────
 
 CREATE TABLE email_log (
-  id          uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   client_id   uuid NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
   firm_id     uuid NOT NULL REFERENCES firms(id) ON DELETE CASCADE,
   workflow_id uuid REFERENCES workflows(id) ON DELETE SET NULL,
@@ -63,7 +63,7 @@ CREATE INDEX idx_email_log_firm   ON email_log(firm_id);
 -- ────────────────────────────────────────────────────────────
 
 CREATE TABLE events (
-  id          uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   client_id   uuid NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
   firm_id     uuid NOT NULL REFERENCES firms(id) ON DELETE CASCADE,
   workflow_id uuid REFERENCES workflows(id) ON DELETE SET NULL,

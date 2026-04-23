@@ -44,7 +44,7 @@ ALTER TYPE job_type ADD VALUE IF NOT EXISTS 'payroll_reminder';
 -- ────────────────────────────────────────────────────────────
 
 CREATE TABLE integrations (
-  id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   firm_id         uuid NOT NULL REFERENCES firms(id) ON DELETE CASCADE,
   provider        integration_provider NOT NULL,
   status          integration_status NOT NULL DEFAULT 'pending_auth',
@@ -90,7 +90,7 @@ CREATE TRIGGER trg_integrations_updated
 -- ────────────────────────────────────────────────────────────
 
 CREATE TABLE client_integrations (
-  id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   firm_id         uuid NOT NULL REFERENCES firms(id) ON DELETE CASCADE,
   client_id       uuid NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
   integration_id  uuid NOT NULL REFERENCES integrations(id) ON DELETE CASCADE,
@@ -125,7 +125,7 @@ CREATE INDEX idx_client_integrations_external    ON client_integrations(integrat
 -- ────────────────────────────────────────────────────────────
 
 CREATE TABLE client_portal_tokens (
-  id          uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   firm_id     uuid NOT NULL REFERENCES firms(id) ON DELETE CASCADE,
   client_id   uuid NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
 
@@ -154,7 +154,7 @@ CREATE INDEX idx_portal_tokens_firm   ON client_portal_tokens(firm_id);
 -- ────────────────────────────────────────────────────────────
 
 CREATE TABLE stripe_subscriptions (
-  id                  uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   firm_id             uuid NOT NULL UNIQUE REFERENCES firms(id) ON DELETE CASCADE,
 
   stripe_customer_id  text NOT NULL UNIQUE,
@@ -187,7 +187,7 @@ CREATE TRIGGER trg_stripe_sub_updated
 -- ────────────────────────────────────────────────────────────
 
 CREATE TABLE billing_events (
-  id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   firm_id         uuid NOT NULL REFERENCES firms(id) ON DELETE CASCADE,
   workflow_id     uuid REFERENCES workflows(id) ON DELETE SET NULL,
   client_id       uuid REFERENCES clients(id) ON DELETE SET NULL,
@@ -245,7 +245,7 @@ CREATE TRIGGER trg_workflow_billing
 -- ────────────────────────────────────────────────────────────
 
 CREATE TABLE qbo_sync_log (
-  id                  uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   firm_id             uuid NOT NULL REFERENCES firms(id) ON DELETE CASCADE,
   integration_id      uuid NOT NULL REFERENCES integrations(id) ON DELETE CASCADE,
   client_id           uuid REFERENCES clients(id) ON DELETE SET NULL,
