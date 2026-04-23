@@ -1,7 +1,0 @@
-{
-  "framework": "nextjs",
-  "rootDirectory": "apps/web",
-  "buildCommand": "next build",
-  "devCommand": "next dev",
-  "installCommand": "pnpm install"
-}
