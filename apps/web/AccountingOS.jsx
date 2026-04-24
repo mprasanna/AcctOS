@@ -109,14 +109,22 @@ function wfRiskScore(wc, client) {
   return s;
 }
 
-
 function useClients() {
   const [clients, setClients] = useState([])
 
   useEffect(() => {
     fetch('/api/clients', { credentials: 'include' })
       .then(r => r.json())
-      .then(json => { if (json.data) setClients(json.data) })
+      .then(json => {
+        if (json.data) {
+          const mapped = json.data.map(c => ({
+            ...c,
+            daysToDeadline: c.days_to_deadline,
+            activeWf: c.active_workflow,
+          }))
+          setClients(mapped)
+        }
+      })
       .catch(console.error)
   }, [])
 
