@@ -120,7 +120,21 @@ function useClients() {
           const mapped = json.data.map(c => ({
             ...c,
             daysToDeadline: c.days_to_deadline,
-            activeWf: c.active_workflow,
+            activeWf: {
+              ...c.active_workflow,
+              computed: {
+                status: c.active_workflow?.computed_status,
+                flags: c.active_workflow?.computed_flags,
+              },
+              stages: c.active_workflow?.stages ?? [],
+            },
+            workflows: (c.workflows ?? []).map(wf => ({
+              ...wf,
+              computed: {
+                status: wf.computed_status,
+                flags: wf.computed_flags,
+              }
+            }))
           }))
           setClients(mapped)
         }
