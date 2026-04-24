@@ -5,6 +5,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 // These routes are accessible without a Supabase JWT.
 const PUBLIC_API_PREFIXES = [
   '/api/auth/login',
+  '/api/auth/logout',    // ← FIXED: was missing; a logged-out user hitting logout was getting 401
   '/api/auth/signup',
   '/api/auth/refresh',
   '/api/portal/',        // token-gated, not JWT-gated
@@ -12,6 +13,7 @@ const PUBLIC_API_PREFIXES = [
 ]
 
 const PUBLIC_PAGE_PREFIXES = [
+  '/',                   // ← FIXED: root landing page must be public
   '/login',
   '/signup',
   '/portal/',            // client portal page
@@ -21,7 +23,9 @@ const PUBLIC_PAGE_PREFIXES = [
 function isPublicRoute(pathname: string): boolean {
   return (
     PUBLIC_API_PREFIXES.some(p => pathname.startsWith(p)) ||
-    PUBLIC_PAGE_PREFIXES.some(p => pathname.startsWith(p))
+    // Exact match for '/' only — don't accidentally open all routes
+    pathname === '/' ||
+    PUBLIC_PAGE_PREFIXES.filter(p => p !== '/').some(p => pathname.startsWith(p))
   )
 }
 

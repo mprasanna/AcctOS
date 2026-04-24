@@ -1,6 +1,4 @@
-"use client"
-import { useState, useMemo, useEffect } from "react";
-
+import { useState, useMemo } from "react";
 
 // ─── DESIGN TOKENS ────────────────────────────────────────────────────────────
 const C = {
@@ -19,7 +17,265 @@ function fmtDate(d) { return new Date(d).toLocaleDateString("en-CA", { month: "s
 function fmtLong(d) { return new Date(d).toLocaleDateString("en-CA", { month: "long", day: "numeric", year: "numeric" }); }
 
 // ─── USERS ────────────────────────────────────────────────────────────────────
-import { RAW_CLIENTS, USERS } from "./acctosData";
+const USERS = {
+  u_pw: { name: "Patrick W.",  initials: "PW", role: "Owner / Senior CPA" },
+  u_ks: { name: "Kiera S.",    initials: "KS", role: "Senior Accountant" },
+  u_jr: { name: "James R.",    initials: "JR", role: "Accountant" },
+  u_rh: { name: "Reece H.",    initials: "RH", role: "Admin" },
+};
+
+// ─── RAW CLIENT DATA ──────────────────────────────────────────────────────────
+// taskInProgressDays lives on each WORKFLOW now (not on client) — fixes C4 scope
+const RAW_CLIENTS = [
+  {
+    id: "c_maple",
+    name: "Maple Contracting Ltd.",
+    type: "Corporation", initials: "MC", freq: "Monthly",
+    city: "Ottawa, ON", since: "2022", bn: "81427 3910 RT0001",
+    assigned: "u_ks", netGst: 4820, riskHistory: false, penaltyRisk: null,
+    workflows: [
+      {
+        id: "wf_maple_gst_oct", type: "GST/HST", label: "GST/HST — October 2025",
+        period: "Oct 2025", deadline: new Date("2025-10-31"), cycleStart: new Date("2025-10-01"),
+        curStage: 3, taskInProgressDays: 2,
+        stageNotes: { 1: "Reconciled in QBO — Oct 2", 2: "All docs received — Oct 5", 3: "Draft in progress — Oct 6" },
+        stages: [
+          { n:1, name:"Bookkeeping",         status:"complete",    date:"Oct 2",  gate:"bookkeepingStatus = complete",              gateLabel:"Bookkeeping confirmed in QBO" },
+          { n:2, name:"Document Collection", status:"complete",    date:"Oct 5",  gate:"allDocsReceived = true",                    gateLabel:"All required documents received" },
+          { n:3, name:"Preparation",         status:"in_progress", date:"Oct 6",  gate:"stage2Complete = true",                     gateLabel:"Corporation → ITC reconciliation required" },
+          { n:4, name:"Review",              status:"pending",                    gate:"preparationComplete = true",                gateLabel:"GST $4,820 — single review sufficient" },
+          { n:5, name:"Filing",              status:"pending",                    gate:"reviewApproved = true",                     gateLabel:"Review approval required before filing" },
+          { n:6, name:"Confirmation",        status:"pending",                    gate:"filingComplete = true",                     gateLabel:"Record CRA confirmation number" },
+        ],
+        tasks: [
+          { title:"Reconcile QBO through period end",         who:"KS", due:"Oct 1",  status:"complete" },
+          { title:"Confirm bank feeds match",                  who:"KS", due:"Oct 1",  status:"complete" },
+          { title:"Flag any unclassified transactions",        who:"PW", due:"Oct 2",  status:"complete" },
+          { title:"Request required documents",                who:"RH", due:"Oct 3",  status:"complete" },
+          { title:"Confirm ITC reconciliation (Corporation)",  who:"KS", due:"Oct 8",  status:"complete" },
+          { title:"Calculate GST and prepare draft return",    who:"KS", due:"Oct 10", status:"in_progress" },
+          { title:"Senior review and sign-off",                who:"PW", due:"Oct 15", status:"pending" },
+          { title:"Submit return to CRA",                      who:"KS", due:"Oct 31", status:"pending" },
+          { title:"Record CRA confirmation number",            who:"KS", due:"Oct 31", status:"pending" },
+        ],
+        docs: [
+          { name:"Bank_Statement_Oct25.pdf",   status:"received", reminderCount:0, uploadedAt:"Oct 5", by:"Client upload" },
+          { name:"Vendor_Invoices_Oct25.zip",  status:"received", reminderCount:0, uploadedAt:"Oct 5", by:"Client upload" },
+          { name:"Expense_Receipts_Oct25.pdf", status:"received", reminderCount:0, uploadedAt:"Oct 5", by:"Client upload" },
+          { name:"QBO_Export_Oct25.csv",       status:"received", reminderCount:0, uploadedAt:"Oct 2", by:"Auto-sync" },
+        ],
+      },
+      {
+        id:"wf_maple_t2", type:"T2", label:"Corporate Year-End 2025",
+        period:"FY 2025", deadline:new Date("2026-03-31"), cycleStart:new Date("2026-01-01"),
+        curStage:1, taskInProgressDays:0, stages:[], tasks:[], docs:[],
+      },
+      {
+        id:"wf_maple_payroll", type:"Payroll", label:"Payroll Remittance — Oct",
+        period:"Oct 2025", deadline:new Date("2025-11-15"), cycleStart:new Date("2025-10-01"),
+        curStage:2, taskInProgressDays:0, stages:[], tasks:[], docs:[],
+      },
+    ],
+    activity: [
+      { t:"Oct 6 10:14", who:"Kiera S.",  act:"Started Stage 3 — Preparation",   detail:"Draft return underway" },
+      { t:"Oct 5 14:02", who:"Reece H.",  act:"Marked documents complete",        detail:"4 of 4 received" },
+      { t:"Oct 2 09:11", who:"System",    act:"Bookkeeping auto-verified",        detail:"QBO reconciled through Sep 30" },
+      { t:"Oct 1 07:00", who:"System",    act:"Workflow auto-generated",          detail:"GST/HST October 2025" },
+    ],
+    emailLog: [],
+  },
+  {
+    id: "c_sunrise",
+    name: "Sunrise Bakery Inc.",
+    type: "Corporation", initials: "SB", freq: "Monthly",
+    city: "Ottawa, ON", since: "2021", bn: "72841 6603 RT0001",
+    assigned: "u_jr", netGst: null, riskHistory: false, penaltyRisk: null,
+    workflows: [
+      {
+        id:"wf_sunrise_gst_oct", type:"GST/HST", label:"GST/HST — October 2025",
+        period:"Oct 2025", deadline:new Date("2025-10-31"), cycleStart:new Date("2025-10-01"),
+        curStage:2, taskInProgressDays:0,
+        stageNotes: { 1:"Confirmed — Oct 2", 2:"Reminder #2 sent Oct 9, no response" },
+        stages: [
+          { n:1, name:"Bookkeeping",         status:"complete",  date:"Oct 2",                    gate:"bookkeepingStatus = complete",   gateLabel:"Bookkeeping confirmed in QBO" },
+          { n:2, name:"Document Collection", status:"blocked",   date:"Reminder #2 sent Oct 9",   gate:"allDocsReceived = false",        gateLabel:"3 documents still pending — Stage 3 is blocked until all docs received", blocked:true, blockReason:"Client has not responded to Reminder #2 (sent Oct 9). Stage 3 cannot begin until bank statement, invoices, and receipts are received." },
+          { n:3, name:"Preparation",         status:"pending",                                    gate:"stage2Complete = true",          gateLabel:"Waiting on document gate", blocked:true, blockReason:"Blocked by Stage 2. Cannot prepare return until all documents are on file." },
+          { n:4, name:"Review",              status:"pending",                                    gate:"preparationComplete = true",     gateLabel:"Blocked by Stage 2", blocked:true, blockReason:"Blocked upstream — resolve document collection first." },
+          { n:5, name:"Filing",              status:"pending",                                    gate:"reviewApproved = true",          gateLabel:"Blocked by Stage 2", blocked:true, blockReason:"Blocked upstream — resolve document collection first." },
+          { n:6, name:"Confirmation",        status:"pending",                                    gate:"filingComplete = true",          gateLabel:"Record CRA confirmation number" },
+        ],
+        tasks: [
+          { title:"Reconcile QBO through period end",              who:"JR",  due:"Oct 1", status:"complete" },
+          { title:"Request required documents",                    who:"RH",  due:"Oct 3", status:"in_progress" },
+          { title:"Automated Reminder #1",                         who:"Bot", due:"Oct 3", status:"complete" },
+          { title:"Automated Reminder #2 — escalate to owner",    who:"Bot", due:"Oct 6", status:"complete" },
+          { title:"Calculate GST and prepare draft return",        who:"JR",  due:"Oct 10",status:"blocked" },
+          { title:"Senior review and sign-off",                    who:"PW",  due:"Oct 15",status:"blocked" },
+          { title:"Submit return to CRA",                          who:"JR",  due:"Oct 31",status:"blocked" },
+          { title:"Record CRA confirmation number",                who:"JR",  due:"Oct 31",status:"blocked" },
+        ],
+        docs: [
+          { name:"Bank Statement — October",  status:"pending", reminderCount:2, lastReminderAt:"Oct 9", uploadedAt:null },
+          { name:"Outstanding Invoices",      status:"pending", reminderCount:2, lastReminderAt:"Oct 9", uploadedAt:null },
+          { name:"Expense Receipts >$500",    status:"pending", reminderCount:2, lastReminderAt:"Oct 9", uploadedAt:null },
+        ],
+      },
+    ],
+    activity: [
+      { t:"Oct 9 08:00", who:"System",    act:"Reminder #2 sent — owner notified",  detail:"Document blocker escalated to Patrick W." },
+      { t:"Oct 6 08:00", who:"System",    act:"Reminder #1 sent to client",         detail:"No response after 3 days" },
+      { t:"Oct 3 07:00", who:"Reece H.",  act:"Initial document request sent",      detail:"3 items requested" },
+      { t:"Oct 1 07:00", who:"System",    act:"Workflow auto-generated",            detail:"GST/HST October 2025" },
+    ],
+    emailLog: [
+      { type:"Initial Request",           date:"Oct 3", status:"sent" },
+      { type:"Reminder #1",               date:"Oct 6", status:"sent" },
+      { type:"Reminder #2 — Escalation",  date:"Oct 9", status:"sent" },
+    ],
+  },
+  {
+    id: "c_patel",
+    name: "Patel & Sons Holdings",
+    type: "Corporation", initials: "PS", freq: "Quarterly",
+    city: "Mississauga, ON", since: "2019", bn: "55301 2214 RT0001",
+    assigned: "u_ks", netGst: 14800, riskHistory: true, penaltyRisk: "HIGH",
+    workflows: [
+      {
+        id:"wf_patel_gst_q2", type:"GST/HST", label:"GST/HST — Q2 2025",
+        period:"Q2 2025 (Apr–Jun)", deadline:new Date("2025-07-31"), cycleStart:new Date("2025-07-01"),
+        curStage:5, taskInProgressDays:0,
+        stageNotes: { 1:"Complete", 2:"Complete", 3:"Complete", 4:"Dual review — both approved (GST > $10k)", 5:"MISSED — accountant was away" },
+        stages: [
+          { n:1, name:"Bookkeeping",         status:"complete",  gate:"bookkeepingStatus = complete",  gateLabel:"Bookkeeping confirmed in QBO" },
+          { n:2, name:"Document Collection", status:"complete",  gate:"allDocsReceived = true",        gateLabel:"All docs received" },
+          { n:3, name:"Preparation",         status:"complete",  gate:"stage2Complete = true",         gateLabel:"ITC reconciliation complete" },
+          { n:4, name:"Review",              status:"complete",  gate:"preparationComplete = true",    gateLabel:"GST $14,800 > $10,000 → dual review required ✓" },
+          { n:5, name:"Filing",              status:"missed",    date:"Missed Jul 31",                 gate:"reviewApproved = true",         gateLabel:"Gate passed — filing missed due to accountant absence", missed:true, blockReason:"CRA deadline passed Jul 31. Late filing required immediately. Interest and penalties accumulating. File today — log reason in CRA correspondence." },
+          { n:6, name:"Confirmation",        status:"pending",   gate:"filingComplete = true",         gateLabel:"Record CRA confirmation after late filing" },
+        ],
+        tasks: [
+          { title:"Reconcile QBO through period end",              who:"KS", due:"Jul 1",  status:"complete" },
+          { title:"Confirm ITC reconciliation (Corporation)",      who:"KS", due:"Jul 5",  status:"complete" },
+          { title:"Confirm all Q2 docs received",                  who:"RH", due:"Jul 3",  status:"complete" },
+          { title:"Calculate GST and prepare draft return",        who:"KS", due:"Jul 10", status:"complete" },
+          { title:"Accountant review and sign-off",                who:"KS", due:"Jul 13", status:"complete" },
+          { title:"Senior review — GST > $10,000 dual approval",  who:"PW", due:"Jul 15", status:"complete" },
+          { title:"Submit return to CRA",                          who:"KS", due:"Jul 31", status:"missed" },
+          { title:"Record CRA confirmation number",                who:"KS", due:"Jul 31", status:"pending" },
+        ],
+        docs: [
+          { name:"Bank Statement — Q2", status:"received", reminderCount:0, uploadedAt:"Jul 5" },
+          { name:"Invoices — April",    status:"received", reminderCount:0, uploadedAt:"Jul 5" },
+          { name:"Invoices — May",      status:"received", reminderCount:0, uploadedAt:"Jul 5" },
+          { name:"Invoices — June",     status:"received", reminderCount:0, uploadedAt:"Jul 6" },
+        ],
+      },
+    ],
+    activity: [
+      { t:"Oct 14 09:00", who:"System",     act:"Overdue flag raised",                 detail:"75 days past CRA deadline — penalty risk HIGH" },
+      { t:"Jul 31 17:00", who:"System",     act:"Filing deadline passed — not filed",  detail:"KS was away, no backup coverage" },
+      { t:"Jul 15 11:22", who:"Patrick W.", act:"Dual review approved",               detail:"GST $14,800 — both reviews complete" },
+      { t:"Jul 10 14:00", who:"Kiera S.",   act:"Draft return prepared",              detail:"Net GST: $14,800" },
+    ],
+    emailLog: [],
+  },
+  {
+    id:"c_rivr",
+    name:"Riviera Auto Body",
+    type:"Sole prop", initials:"RA", freq:"Quarterly",
+    city:"Cornwall, ON", since:"2019", bn:"90412 1120",
+    assigned:"u_jr", netGst:3240, riskHistory:false, penaltyRisk:null,
+    workflows: [
+      {
+        id:"wf_rivr_gst_q3", type:"GST/HST", label:"GST/HST — Q3 2025",
+        period:"Q3 2025", deadline:new Date("2025-10-31"), cycleStart:new Date("2025-10-01"),
+        curStage:3, taskInProgressDays:0,
+        stages: [
+          { n:1, name:"Bookkeeping",         status:"complete",    gate:"bookkeepingStatus = complete",  gateLabel:"Bookkeeping confirmed" },
+          { n:2, name:"Document Collection", status:"complete",    gate:"allDocsReceived = true",        gateLabel:"All docs received" },
+          { n:3, name:"Preparation",         status:"in_progress", gate:"stage2Complete = true",         gateLabel:"Sole prop → simplified checklist (no ITCs); revenue threshold check" },
+          { n:4, name:"Review",              status:"pending",     gate:"preparationComplete = true",    gateLabel:"Single review — sole proprietor" },
+          { n:5, name:"Filing",              status:"pending",     gate:"reviewApproved = true",         gateLabel:"Review approval required" },
+          { n:6, name:"Confirmation",        status:"pending",     gate:"filingComplete = true",         gateLabel:"Record CRA confirmation" },
+        ],
+        tasks: [
+          { title:"Reconcile QBO through Q3",                        who:"JR", due:"Oct 3",  status:"complete" },
+          { title:"Request simplified doc checklist",                 who:"RH", due:"Oct 3",  status:"complete" },
+          { title:"Annual revenue threshold check (< $30k exempt?)", who:"JR", due:"Oct 5",  status:"complete" },
+          { title:"Calculate GST — simplified return",               who:"JR", due:"Oct 10", status:"in_progress" },
+          { title:"Review and sign-off",                             who:"KS", due:"Oct 20", status:"pending" },
+          { title:"Submit return to CRA",                            who:"JR", due:"Oct 31", status:"pending" },
+          { title:"Record CRA confirmation number",                  who:"JR", due:"Oct 31", status:"pending" },
+        ],
+        docs: [
+          { name:"Bank Statement — Q3",    status:"received", reminderCount:0, uploadedAt:"Oct 4" },
+          { name:"Sales Invoices",         status:"received", reminderCount:0, uploadedAt:"Oct 4" },
+          { name:"Expense Receipts >$100", status:"received", reminderCount:0, uploadedAt:"Oct 4" },
+        ],
+      },
+    ],
+    activity: [
+      { t:"Oct 5 10:00", who:"James R.", act:"Simplified checklist applied",  detail:"Sole prop — no ITC reconciliation required" },
+      { t:"Oct 3 09:00", who:"System",   act:"Workflow auto-generated",       detail:"GST/HST Q3 2025" },
+    ],
+    emailLog: [],
+  },
+  {
+    id:"c_nort",
+    name:"Northbridge Logistics",
+    type:"Corporation", initials:"NL", freq:"Monthly",
+    city:"Ottawa, ON", since:"2018", bn:"55201 7214 RT0001",
+    assigned:"u_ks", netGst:6100, riskHistory:false, penaltyRisk:null,
+    workflows: [
+      {
+        id:"wf_nort_gst_sep", type:"GST/HST", label:"GST/HST — September 2025",
+        period:"Sep 2025", deadline:new Date("2025-10-31"), cycleStart:new Date("2025-09-01"),
+        curStage:6, taskInProgressDays:0,
+        stages: [
+          { n:1, name:"Bookkeeping",         status:"complete", gate:"", gateLabel:"" },
+          { n:2, name:"Document Collection", status:"complete", gate:"", gateLabel:"" },
+          { n:3, name:"Preparation",         status:"complete", gate:"", gateLabel:"" },
+          { n:4, name:"Review",              status:"complete", gate:"", gateLabel:"" },
+          { n:5, name:"Filing",              status:"complete", gate:"", gateLabel:"" },
+          { n:6, name:"Confirmation",        status:"complete", gate:"", gateLabel:"CRA conf #RT2025-48291 · Filed Oct 3" },
+        ],
+        tasks:[], docs:[],
+      },
+    ],
+    activity: [
+      { t:"Oct 3 11:00", who:"Kiera S.", act:"CRA confirmation recorded",  detail:"Filed Sep 30 — conf #RT2025-48291" },
+      { t:"Oct 2 15:00", who:"Kiera S.", act:"Return submitted to CRA",    detail:"Net GST: $6,100" },
+    ],
+    emailLog: [],
+  },
+  {
+    id:"c_lake",
+    name:"Lakeshore Dental Group",
+    type:"Corporation", initials:"LD", freq:"Quarterly",
+    city:"Kingston, ON", since:"2020", bn:"66312 9981 RT0001",
+    assigned:"u_jr", netGst:8120, riskHistory:false, penaltyRisk:null,
+    workflows: [
+      {
+        id:"wf_lake_gst_q3", type:"GST/HST", label:"GST/HST — Q3 2025",
+        period:"Q3 2025", deadline:new Date("2025-10-31"), cycleStart:new Date("2025-10-01"),
+        curStage:4, taskInProgressDays:0,
+        stages: [
+          { n:1, name:"Bookkeeping",         status:"complete",    gate:"", gateLabel:"Complete" },
+          { n:2, name:"Document Collection", status:"complete",    gate:"", gateLabel:"Complete" },
+          { n:3, name:"Preparation",         status:"complete",    gate:"", gateLabel:"Complete" },
+          { n:4, name:"Review",              status:"in_progress", gate:"preparationComplete = true", gateLabel:"Single review — $8,120 under dual-review threshold" },
+          { n:5, name:"Filing",              status:"pending",     gate:"reviewApproved = true",      gateLabel:"Waiting on Stage 4 review approval" },
+          { n:6, name:"Confirmation",        status:"pending",     gate:"filingComplete = true",      gateLabel:"Record CRA confirmation" },
+        ],
+        tasks:[], docs:[],
+      },
+    ],
+    activity: [
+      { t:"Oct 12 14:00", who:"James R.", act:"Draft sent to KS for review", detail:"Net GST: $8,120" },
+    ],
+    emailLog: [],
+  },
+];
 
 // ─── WORKFLOW-LEVEL ENGINE ────────────────────────────────────────────────────
 // Computes status PER WORKFLOW, then aggregates to client level.
@@ -149,7 +405,6 @@ function useClients() {
 
   return clients
 }
-
 
 // ─── GATE ENFORCEMENT LOGIC ───────────────────────────────────────────────────
 // Determines whether a stage is hard-blocked and why.
@@ -1152,10 +1407,22 @@ export default function App() {
         <div style={{ padding:"12px 14px", borderTop:`1px solid ${C.border}` }}>
           <div style={{ display:"flex", alignItems:"center", gap:8 }}>
             <Avatar name="Patrick W." size={26} />
-            <div>
+            <div style={{ flex:1, minWidth:0 }}>
               <div style={{ fontSize:11, fontWeight:600, color:C.text }}>Patrick W.</div>
               <div style={{ fontSize:10, color:C.muted }}>Owner · Growth Plan</div>
             </div>
+            <button
+              title="Sign out"
+              onClick={async () => {
+                await fetch("/api/auth/logout", { method:"POST", credentials:"include" });
+                window.location.href = "/login";
+              }}
+              style={{ background:"none", border:"none", cursor:"pointer", padding:"4px 6px", borderRadius:6, color:C.slate, fontSize:14, flexShrink:0, lineHeight:1 }}
+              onMouseEnter={e => { e.currentTarget.style.background="#F1F5F9"; e.currentTarget.style.color=C.red; }}
+              onMouseLeave={e => { e.currentTarget.style.background="none"; e.currentTarget.style.color=C.slate; }}
+            >
+              ⏻
+            </button>
           </div>
         </div>
       </div>

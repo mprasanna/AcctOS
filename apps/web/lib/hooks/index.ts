@@ -124,8 +124,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const signOut = useCallback(async () => {
-    await supabase.auth.signOut()
-    setUser(null)
+    // Call the server-side logout route so Supabase SSR can clear the
+    // session cookie via Set-Cookie response headers. Calling
+    // supabase.auth.signOut() directly on the client does NOT clear the
+    // httpOnly server cookie — the middleware would still see the user as
+    // authenticated on the next request.
+    setUser(null) // Optimistic clear — feels instant in the UI
+    await fetch('/api/auth/logout', {
+      method: 'POST',
+      credentials: 'include',
+    })
+    // fetch follows the 302 redirect automatically but won't navigate the
+    // page. Force a hard navigation so Next.js re-runs middleware cleanly.
     window.location.href = '/login'
   }, [])
 
