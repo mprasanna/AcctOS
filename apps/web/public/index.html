@@ -1,0 +1,674 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AcctOS — Canadian Accounting Operations</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --navy:#0D1B2A;--navy2:#112236;--navy3:#1A3050;
+  --teal:#0D9488;--teal2:#14B8A6;--teal3:#5EEAD4;
+  --amber:#F59E0B;--red:#EF4444;--green:#22C55E;
+  --white:#FFFFFF;--off:#F0F6FF;
+  --muted:#94A3B8;--slate:#64748B;
+  --border:rgba(255,255,255,0.08);--border2:rgba(255,255,255,0.14);
+  --card:rgba(255,255,255,0.04);--card2:rgba(255,255,255,0.07);
+}
+html{scroll-behavior:smooth}
+body{background:var(--navy);color:var(--white);font-family:'DM Sans',sans-serif;font-size:15px;line-height:1.6;overflow-x:hidden}
+
+/* NAV */
+nav{position:sticky;top:0;z-index:100;background:rgba(13,27,42,0.92);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:0 40px;display:flex;align-items:center;justify-content:space-between;height:58px}
+.nav-logo{display:flex;align-items:center;gap:10px}
+.logo-mark{width:32px;height:32px;background:var(--teal);border-radius:8px;display:flex;align-items:center;justify-content:center;font-family:'Playfair Display',serif;font-size:16px;font-weight:700;color:#fff;flex-shrink:0}
+.logo-text{font-family:'Playfair Display',serif;font-size:17px;font-weight:700}
+.nav-links{display:flex;gap:28px;align-items:center}
+.nav-links a{color:var(--muted);text-decoration:none;font-size:13px;font-weight:500;transition:color .2s}
+.nav-links a:hover{color:var(--white)}
+.nav-cta{background:var(--teal);color:#fff;border:none;padding:8px 18px;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:background .2s}
+.nav-cta:hover{background:var(--teal2)}
+
+/* HERO */
+.hero{display:grid;grid-template-columns:1fr 440px;gap:60px;padding:80px 40px 60px;max-width:1200px;margin:0 auto;align-items:center}
+.hero-badge{display:inline-flex;align-items:center;gap:8px;background:rgba(13,148,136,0.15);border:1px solid rgba(13,148,136,0.35);border-radius:20px;padding:5px 14px;font-size:12px;color:var(--teal3);font-weight:600;margin-bottom:22px;letter-spacing:.04em}
+.hero-badge-dot{width:7px;height:7px;background:var(--teal2);border-radius:50%}
+h1{font-family:'Playfair Display',serif;font-size:52px;line-height:1.08;font-weight:900;margin-bottom:20px}
+h1 span{color:var(--teal2)}
+.hero-sub{color:var(--muted);font-size:16px;line-height:1.7;max-width:480px;margin-bottom:32px}
+.hero-stats{display:flex;gap:32px;margin-top:8px}
+.stat{border-left:2px solid var(--teal);padding-left:14px}
+.stat-num{font-family:'Playfair Display',serif;font-size:26px;font-weight:700;color:var(--white)}
+.stat-label{font-size:11px;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:.06em}
+
+/* LOGIN CARD */
+.login-card{background:var(--navy2);border:1px solid var(--border2);border-radius:16px;padding:32px;flex-shrink:0}
+.login-title{font-family:'Playfair Display',serif;font-size:22px;font-weight:700;margin-bottom:4px}
+.login-sub{color:var(--muted);font-size:13px;margin-bottom:24px}
+.form-group{margin-bottom:16px}
+.form-label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em}
+.form-input{width:100%;background:rgba(255,255,255,0.05);border:1px solid var(--border2);border-radius:8px;padding:10px 14px;color:var(--white);font-family:'DM Sans',sans-serif;font-size:14px;outline:none;transition:border-color .2s}
+.form-input:focus{border-color:var(--teal)}
+.form-input::placeholder{color:rgba(148,163,184,.5)}
+.login-btn{width:100%;background:var(--teal);border:none;border-radius:8px;padding:12px;color:#fff;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;cursor:pointer;margin-top:8px;transition:background .2s}
+.login-btn:hover{background:var(--teal2)}
+.login-divider{text-align:center;color:var(--muted);font-size:12px;margin:16px 0;position:relative}
+.login-divider::before{content:'';position:absolute;left:0;top:50%;width:42%;height:1px;background:var(--border2)}
+.login-divider::after{content:'';position:absolute;right:0;top:50%;width:42%;height:1px;background:var(--border2)}
+.demo-btn{width:100%;background:transparent;border:1px solid var(--border2);border-radius:8px;padding:11px;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;transition:all .2s}
+.demo-btn:hover{border-color:var(--teal);color:var(--teal3)}
+.login-note{text-align:center;font-size:11px;color:var(--slate);margin-top:14px}
+.login-note a{color:var(--teal3);text-decoration:none}
+
+/* SECTION COMMON */
+section{padding:72px 40px;max-width:1200px;margin:0 auto}
+.section-label{font-size:11px;font-weight:600;color:var(--teal2);letter-spacing:.1em;text-transform:uppercase;margin-bottom:12px}
+.section-title{font-family:'Playfair Display',serif;font-size:38px;font-weight:700;line-height:1.15;margin-bottom:14px}
+.section-sub{color:var(--muted);font-size:15px;line-height:1.7;max-width:580px;margin-bottom:48px}
+
+/* PHASES SECTION */
+.phases-section{background:var(--navy2);border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:72px 0}
+.phases-inner{max-width:1200px;margin:0 auto;padding:0 40px}
+.phase-tabs{display:flex;gap:4px;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:12px;padding:5px;margin-bottom:40px;overflow-x:auto}
+.phase-tab{flex:1;min-width:120px;padding:10px 16px;border:none;border-radius:8px;background:transparent;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;transition:all .2s;white-space:nowrap;text-align:center}
+.phase-tab.active{background:var(--teal);color:#fff;font-weight:600}
+.phase-tab:hover:not(.active){color:var(--white);background:rgba(255,255,255,0.06)}
+.phase-content{display:none}
+.phase-content.active{display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:start}
+.phase-info{}
+.phase-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.3);border-radius:20px;padding:4px 12px;font-size:11px;font-weight:600;color:#4ADE80;margin-bottom:16px;letter-spacing:.04em}
+.phase-title{font-family:'Playfair Display',serif;font-size:28px;font-weight:700;margin-bottom:10px;line-height:1.2}
+.phase-desc{color:var(--muted);font-size:14px;line-height:1.75;margin-bottom:24px}
+.feature-list{display:flex;flex-direction:column;gap:10px}
+.feature-item{display:flex;align-items:flex-start;gap:10px;font-size:13px}
+.feature-check{width:18px;height:18px;background:rgba(13,148,136,0.2);border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px}
+.feature-check-inner{width:6px;height:6px;background:var(--teal2);border-radius:50%}
+.feature-text{color:var(--off);line-height:1.5}
+.feature-text strong{color:#fff;font-weight:600}
+
+/* SCREENSHOT MOCKUP */
+.screenshot-wrap{background:rgba(255,255,255,0.03);border:1px solid var(--border2);border-radius:12px;overflow:hidden}
+.screen-bar{background:rgba(255,255,255,0.06);padding:10px 14px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border)}
+.screen-dots{display:flex;gap:5px}
+.dot{width:8px;height:8px;border-radius:50%}
+.dot-r{background:#EF4444}
+.dot-y{background:#F59E0B}
+.dot-g{background:#22C55E}
+.screen-url{flex:1;background:rgba(255,255,255,0.07);border-radius:5px;padding:4px 10px;font-size:11px;color:var(--slate);text-align:center}
+.screen-body{padding:0}
+
+/* PRODUCT MOCKUP STYLES (inside screenshots) */
+.mock{background:#F8FAFC;color:#0F172A;font-family:'DM Sans',sans-serif;font-size:12px}
+.mock-sidebar{width:160px;background:#fff;border-right:1px solid #E2E8F0;padding:10px 0;flex-shrink:0}
+.mock-main{flex:1;padding:16px;background:#F8FAFC;overflow:hidden}
+.mock-layout{display:flex;height:320px}
+.mock-nav-item{padding:6px 12px;font-size:11px;color:#475569;cursor:default;display:flex;align-items:center;gap:6px;border-radius:6px;margin:1px 6px}
+.mock-nav-item.active{background:#EFF6FF;color:#2563EB;font-weight:600}
+.mock-header{font-size:14px;font-weight:700;color:#0F172A;margin-bottom:2px}
+.mock-sub{font-size:10px;color:#94A3B8;margin-bottom:12px}
+.mock-tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+.mock-tile{border-radius:8px;padding:10px 12px;background:#fff;border:1px solid #E2E8F0}
+.mock-tile-num{font-size:20px;font-weight:700;margin-top:2px}
+.mock-tile-label{font-size:9px;font-weight:600;margin-bottom:2px}
+.mock-table{width:100%;border-collapse:collapse;font-size:10px}
+.mock-table th{background:#F8FAFC;color:#94A3B8;font-weight:600;text-transform:uppercase;font-size:9px;letter-spacing:.04em;padding:5px 8px;text-align:left;border-bottom:1px solid #E2E8F0}
+.mock-table td{padding:6px 8px;border-bottom:1px solid #E2E8F0;color:#0F172A}
+.mock-badge{display:inline-block;border-radius:10px;padding:2px 7px;font-size:9px;font-weight:600}
+.b-green{background:#DCFCE7;color:#16A34A}
+.b-amber{background:#FEF3C7;color:#F59E0B}
+.b-red{background:#FEE2E2;color:#DC2626}
+.b-blue{background:#EFF6FF;color:#2563EB}
+.b-gray{background:#F1F5F9;color:#64748B}
+.mock-stage-dots{display:flex;align-items:center;gap:2px}
+.mock-dot{width:7px;height:7px;border-radius:50%}
+
+/* ALERT BOXES */
+.mock-alert{border-radius:6px;padding:7px 10px;font-size:10px;margin-bottom:8px;display:flex;gap:6px;align-items:center}
+.alert-red{background:#FEE2E2;color:#DC2626;border:1px solid #FCA5A5}
+.alert-amber{background:#FEF3C7;color:#B45309;border:1px solid #FCD34D}
+
+/* WORKFLOW STAGE MOCKUP */
+.mock-stage-row{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #F1F5F9}
+.mock-stage-circle{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;flex-shrink:0}
+.s-complete{background:#DCFCE7;color:#16A34A;border:1.5px solid #16A34A}
+.s-progress{background:#EFF6FF;color:#2563EB;border:1.5px solid #2563EB}
+.s-blocked{background:#FEE2E2;color:#DC2626;border:1.5px solid #DC2626}
+.s-pending{background:#F1F5F9;color:#94A3B8;border:1.5px solid #E2E8F0}
+.mock-gate{background:#EFF6FF;border:1px solid #BFDBFE;border-radius:5px;padding:4px 8px;font-size:9px;color:#2563EB;margin-top:4px;display:flex;gap:4px;align-items:center}
+.mock-gate-blocked{background:#FFF1F2;border-color:#FECDD3;color:#DC2626}
+
+/* EMAIL/AUTOMATION MOCKUP */
+.mock-email{background:#fff;border:1px solid #E2E8F0;border-radius:8px;margin-bottom:8px;overflow:hidden}
+.mock-email-head{background:#F8FAFC;padding:8px 12px;border-bottom:1px solid #E2E8F0;display:flex;justify-content:space-between;align-items:center}
+.mock-email-body{padding:10px 12px;font-size:10px;color:#475569;line-height:1.5}
+.automation-rule{display:flex;align-items:center;gap:8px;padding:8px;background:#fff;border:1px solid #E2E8F0;border-radius:8px;margin-bottom:6px}
+.rule-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.rule-on{background:#22C55E}
+.rule-off{background:#E2E8F0}
+
+/* INTEGRATION MOCKUP */
+.mock-integration{background:#fff;border:1px solid #E2E8F0;border-radius:8px;padding:10px 12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center}
+.mock-int-logo{width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#fff}
+.int-qbo{background:#2CA01C}
+.int-stripe{background:#635BFF}
+.int-zoho{background:#E41E2B}
+.int-r2{background:#F6821F}
+.mock-int-info{flex:1;margin-left:10px}
+.mock-int-name{font-size:11px;font-weight:600;color:#0F172A}
+.mock-int-status{font-size:9px;color:#94A3B8}
+
+/* CLIENT PORTAL MOCKUP */
+.portal-header{background:#0D1B2A;padding:12px 16px;display:flex;align-items:center;gap:8px}
+.portal-logo{width:22px;height:22px;background:var(--teal);border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff}
+.portal-title{font-size:12px;font-weight:600;color:#fff}
+.portal-body{background:#fff;padding:14px}
+.portal-doc-row{display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid #F1F5F9}
+.portal-upload-btn{background:#0D9488;color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:9px;font-weight:600;cursor:default}
+
+/* BROAD FEATURE STRIP */
+.features-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:48px}
+.feat-card{background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:22px}
+.feat-icon{width:36px;height:36px;background:rgba(13,148,136,0.15);border-radius:8px;display:flex;align-items:center;justify-content:center;margin-bottom:14px;font-size:16px}
+.feat-title{font-size:15px;font-weight:600;color:var(--white);margin-bottom:6px}
+.feat-desc{font-size:13px;color:var(--muted);line-height:1.6}
+
+/* COMPARISON TABLE */
+.comp-wrap{background:var(--navy2);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-top:48px}
+.comp-table{width:100%;border-collapse:collapse}
+.comp-table th{padding:14px 20px;text-align:center;font-size:12px;font-weight:600;color:var(--muted);background:rgba(255,255,255,0.04);border-bottom:1px solid var(--border)}
+.comp-table th:first-child{text-align:left}
+.comp-table th.hl{color:#fff;background:rgba(13,148,136,0.12)}
+.comp-table td{padding:12px 20px;font-size:13px;color:var(--muted);border-bottom:1px solid var(--border);text-align:center}
+.comp-table td:first-child{text-align:left;color:var(--white);font-weight:500}
+.comp-table td.hl{background:rgba(13,148,136,0.06);color:#fff}
+.comp-table tr:last-child td{border-bottom:none}
+.check-yes{color:var(--green);font-size:15px}
+.check-no{color:var(--slate);font-size:12px}
+
+/* CTA SECTION */
+.cta-section{background:linear-gradient(135deg,rgba(13,148,136,.15),rgba(20,184,166,.08));border:1px solid rgba(13,148,136,.25);border-radius:20px;padding:56px;text-align:center;margin:48px 0}
+.cta-title{font-family:'Playfair Display',serif;font-size:38px;font-weight:700;margin-bottom:14px}
+.cta-sub{color:var(--muted);font-size:15px;margin-bottom:32px}
+.cta-buttons{display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
+.btn-primary{background:var(--teal);color:#fff;border:none;padding:13px 28px;border-radius:10px;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;cursor:pointer;transition:background .2s}
+.btn-primary:hover{background:var(--teal2)}
+.btn-outline{background:transparent;color:var(--white);border:1px solid var(--border2);padding:12px 28px;border-radius:10px;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500;cursor:pointer;transition:all .2s}
+.btn-outline:hover{border-color:var(--teal);color:var(--teal3)}
+
+/* FOOTER */
+footer{border-top:1px solid var(--border);padding:32px 40px;display:flex;justify-content:space-between;align-items:center;max-width:1200px;margin:0 auto}
+.footer-brand{display:flex;align-items:center;gap:8px}
+.footer-copy{font-size:12px;color:var(--slate)}
+.footer-links{display:flex;gap:20px}
+.footer-links a{font-size:12px;color:var(--slate);text-decoration:none;transition:color .2s}
+.footer-links a:hover{color:var(--muted)}
+
+@media(max-width:900px){
+  .hero{grid-template-columns:1fr;gap:40px}
+  .phase-content.active{grid-template-columns:1fr}
+  .features-grid{grid-template-columns:1fr 1fr}
+}
+</style>
+
+<h2 class="sr-only">AcctOS — Canadian accounting workflow intelligence platform. Landing page with features, phase overview, and login form.</h2>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">
+    <div class="logo-mark">A</div>
+    <span class="logo-text">AcctOS</span>
+  </div>
+  <div class="nav-links">
+    <a href="#phases">Features</a>
+    <a href="#compare">Compare</a>
+    <a href="#cta">Pricing</a>
+  </div>
+  <button class="nav-cta">Sign in →</button>
+</nav>
+
+<!-- HERO -->
+<div style="max-width:1200px;margin:0 auto;padding:80px 40px 60px">
+<div class="hero" style="padding:0;margin:0">
+  <div>
+    <div class="hero-badge"><div class="hero-badge-dot"></div> Phases 0–4 Production Ready</div>
+    <h1>We Don't Track Work.<br><span>We Predict Risk.</span></h1>
+    <p class="hero-sub">The workflow intelligence platform built specifically for Canadian accounting firms. CRA deadlines native. 5-condition risk engine. Gate enforcement that prevents errors before they become penalties.</p>
+    <div class="hero-stats">
+      <div class="stat"><div class="stat-num">6</div><div class="stat-label">Workflow templates</div></div>
+      <div class="stat"><div class="stat-num">5</div><div class="stat-label">Risk conditions</div></div>
+      <div class="stat"><div class="stat-num">14</div><div class="stat-label">DB migrations</div></div>
+      <div class="stat"><div class="stat-num">98%</div><div class="stat-label">Infra margin</div></div>
+    </div>
+  </div>
+  <div class="login-card">
+    <div class="login-title">Welcome back</div>
+    <div class="login-sub">Sign in to Jensen &amp; Associates CPA</div>
+    <div class="form-group">
+      <label class="form-label">Work email</label>
+      <input class="form-input" type="email" placeholder="patrick@jensenaccounting.ca">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Password</label>
+      <input class="form-input" type="password" placeholder="••••••••••">
+    </div>
+    <button class="login-btn">Sign in to AcctOS</button>
+    <div class="login-divider">or</div>
+    <button class="demo-btn">Request a 30-minute demo</button>
+    <div class="login-note">No account yet? <a href="#">Start your free 60-day pilot →</a></div>
+  </div>
+</div>
+</div>
+
+<!-- PHASE TABS SECTION -->
+<div class="phases-section" id="phases">
+<div class="phases-inner">
+  <div class="section-label">Four phases. One platform.</div>
+  <div class="section-title">Everything a Canadian accounting firm needs</div>
+  <div class="section-sub">Built phase by phase so complexity only arrives when users demand it. All four phases are production-ready today.</div>
+
+  <div class="phase-tabs">
+    <button class="phase-tab active" onclick="showPhase(0)">Phase 1 — MVP</button>
+    <button class="phase-tab" onclick="showPhase(1)">Phase 2 — Multi-user</button>
+    <button class="phase-tab" onclick="showPhase(2)">Phase 3 — Automation</button>
+    <button class="phase-tab" onclick="showPhase(3)">Phase 4 — Integrations</button>
+  </div>
+
+  <!-- PHASE 1 -->
+  <div class="phase-content active" id="phase-0">
+    <div class="phase-info">
+      <div class="phase-badge">✓ Live &nbsp;·&nbsp; Supabase + Next.js</div>
+      <div class="phase-title">Real backend. Real data. Real risk engine.</div>
+      <p class="phase-desc">Phase 1 replaces the demo prototype with a production Supabase database. The 5-condition risk algorithm runs server-side. Every stage transition is gate-validated. Clients are real, workflows are persistent, and the CRA deadline clock never stops.</p>
+      <div class="feature-list">
+        <div class="feature-item"><div class="feature-check"><div class="feature-check-inner"></div></div><span class="feature-text"><strong>Supabase PostgreSQL backend</strong> — 14 migration files, full schema for firms, clients, workflows, stages, tasks, documents and events</span></div>
+        <div class="feature-item"><div class="feature-check"><div class="feature-check-inner"></div></div><span class="feature-text"><strong>5-condition At Risk engine</strong> — C1 timeline breach, C2 deadline proximity, C3 document blocker, C4 stage stall, C5 risk history — per workflow, not per client</span></div>
+        <div class="feature-item"><div class="feature-check"><div class="feature-check-inner"></div></div><span class="feature-text"><strong>Gate-enforced stage transitions</strong> — Stage 3 hard-blocked until all docs received. Filing blocked until review approved. Hard stops with specific reasons.</span></div>
+        <div class="feature-item"><div class="feature-check"><div class="feature-check-inner"></div></div><span class="feature-text"><strong>REST API</strong> — complete endpoints for clients, workflows, stages, tasks, documents, dashboard, and settings</span></div>
+        <div class="feature-item"><div class="feature-check"><div class="feature-check-inner"></div></div><span class="feature-text"><strong>CRA deadlines native</strong> — monthly, quarterly, annual filers. Ontario timezone. No manual configuration.</span></div>
+      </div>
+    </div>
+    <div>
+      <div class="screenshot-wrap">
+        <div class="screen-bar">
+          <div class="screen-dots"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div></div>
+          <div class="screen-url">app.acctos.com/dashboard</div>
+        </div>
+        <div class="screen-body">
+          <div class="mock">
+            <div class="mock-layout">
+              <div class="mock-sidebar">
+                <div style="padding:10px 12px 8px;border-bottom:1px solid #E2E8F0;margin-bottom:6px;display:flex;align-items:center;gap:6px">
+                  <div style="width:22px;height:22px;background:#2563EB;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff">A</div>
+                  <div style="font-size:11px;font-weight:700;color:#0F172A">AcctOS</div>
+                </div>
+                <div class="mock-nav-item active">⊞ Command Centre</div>
+                <div class="mock-nav-item">👥 Clients</div>
+                <div class="mock-nav-item">⚡ Workflows</div>
+                <div class="mock-nav-item">📅 Deadlines</div>
+                <div class="mock-nav-item">🗂 Templates</div>
+                <div class="mock-nav-item">⚙ Settings</div>
+              </div>
+              <div class="mock-main">
+                <div class="mock-header">Command Centre</div>
+                <div class="mock-sub">October 2025 · 6 active clients · Ontario (CRA timezone)</div>
+                <div class="mock-alert alert-red">✕ 1 overdue — CRA deadline passed. File immediately.</div>
+                <div class="mock-alert alert-amber">▲ 2 at risk — will miss deadline if nothing changes today.</div>
+                <div class="mock-tiles">
+                  <div class="mock-tile"><div class="mock-tile-label" style="color:#2563EB">Active</div><div class="mock-tile-num" style="color:#2563EB">5</div></div>
+                  <div class="mock-tile"><div class="mock-tile-label" style="color:#16A34A">On Track</div><div class="mock-tile-num" style="color:#16A34A">2</div></div>
+                  <div class="mock-tile"><div class="mock-tile-label" style="color:#F59E0B">At Risk</div><div class="mock-tile-num" style="color:#F59E0B">2</div></div>
+                  <div class="mock-tile"><div class="mock-tile-label" style="color:#DC2626">Overdue</div><div class="mock-tile-num" style="color:#DC2626">1</div></div>
+                </div>
+                <table class="mock-table">
+                  <tr><th>Client</th><th>Status</th><th>Stage</th><th>Deadline</th></tr>
+                  <tr>
+                    <td><b>Patel &amp; Sons</b><br><span style="color:#94A3B8;font-size:9px">Mississauga, ON</span></td>
+                    <td><span class="mock-badge b-red">Overdue</span></td>
+                    <td><div class="mock-stage-dots"><div class="mock-dot" style="background:#16A34A"></div><div class="mock-dot" style="background:#16A34A"></div><div class="mock-dot" style="background:#16A34A"></div><div class="mock-dot" style="background:#16A34A"></div><div class="mock-dot" style="background:#DC2626"></div><div class="mock-dot" style="background:#E2E8F0"></div></div></td>
+                    <td style="color:#DC2626">75d over</td>
+                  </tr>
+                  <tr>
+                    <td><b>Sunrise Bakery</b><br><span style="color:#94A3B8;font-size:9px">Ottawa, ON</span></td>
+                    <td><span class="mock-badge b-amber">At Risk</span></td>
+                    <td><div class="mock-stage-dots"><div class="mock-dot" style="background:#16A34A"></div><div class="mock-dot" style="background:#DC2626"></div><div class="mock-dot" style="background:#E2E8F0"></div><div class="mock-dot" style="background:#E2E8F0"></div><div class="mock-dot" style="background:#E2E8F0"></div><div class="mock-dot" style="background:#E2E8F0"></div></div></td>
+                    <td style="color:#F59E0B">17d</td>
+                  </tr>
+                  <tr>
+                    <td><b>Maple Contracting</b><br><span style="color:#94A3B8;font-size:9px">Ottawa, ON</span></td>
+                    <td><span class="mock-badge b-green">On Track</span></td>
+                    <td><div class="mock-stage-dots"><div class="mock-dot" style="background:#16A34A"></div><div class="mock-dot" style="background:#16A34A"></div><div class="mock-dot" style="background:#2563EB"></div><div class="mock-dot" style="background:#E2E8F0"></div><div class="mock-dot" style="background:#E2E8F0"></div><div class="mock-dot" style="background:#E2E8F0"></div></div></td>
+                    <td style="color:#475569">17d</td>
+                  </tr>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PHASE 2 -->
+  <div class="phase-content" id="phase-1">
+    <div class="phase-info">
+      <div class="phase-badge">✓ Live &nbsp;·&nbsp; Supabase Auth + RLS</div>
+      <div class="phase-title">Multi-user roles. File uploads. T1 &amp; T2 templates.</div>
+      <p class="phase-desc">Phase 2 turns AcctOS into a real team tool. Supabase Auth with Row Level Security isolates every firm's data at the database level. Four user roles with distinct permissions. Stage auto-advance when tasks complete. File uploads via Supabase Storage.</p>
+      <div class="feature-list">
+        <div class="feature-item"><div class="feature-check"><div class="feature-check-inner"></div></div><span class="feature-text"><strong>4 user roles</strong> — Owner (full access + escalations), Senior Accountant (dual review approval), Accountant (assigned clients), Admin (documents + comms)</span></div>
+        <div class="feature-item"><div class="feature-check"><div class="feature-check-inner"></div></div><span class="feature-text"><strong>Row Level Security</strong> — every query scoped to firm_id at the database level. A bug in application code cannot leak data between firms.</span></div>
+        <div class="feature-item"><div class="feature-check"><div class="feature-check-inner"></div></div><span class="feature-text"><strong>Auto-advance stages</strong> — when all tasks in a stage are complete and the gate condition passes, the workflow advances automatically</span></div>
+        <div class="feature-item"><div class="feature-check"><div class="feature-check-inner"></div></div><span class="feature-text"><strong>File uploads</strong> — clients upload directly to Supabase Storage. Document checklist auto-updates. Stage 2 gate unlocks on receipt.</span></div>
+        <div class="feature-item"><div class="feature-check"><div class="feature-check-inner"></div></div><span class="feature-text"><strong>T1, T2 &amp; Bookkeeping templates</strong> — same engine, new configurations. T1 for personal returns, T2 for corporate, monthly bookkeeping cycle.</span></div>
+      </div>
+    </div>
+    <div>
+      <div class="screenshot-wrap">
+        <div class="screen-bar">
+          <div class="screen-dots"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div></div>
+          <div class="screen-url">app.acctos.com/clients/sunrise-bakery</div>
+        </div>
+        <div class="screen-body">
+          <div class="mock">
+            <div class="mock-layout">
+              <div class="mock-sidebar">
+                <div style="padding:10px 12px 8px;border-bottom:1px solid #E2E8F0;margin-bottom:6px;display:flex;align-items:center;gap:6px">
+                  <div style="width:22px;height:22px;background:#2563EB;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff">A</div>
+                  <div style="font-size:11px;font-weight:700;color:#0F172A">AcctOS</div>
+                </div>
+                <div style="padding:8px 12px;border-bottom:1px solid #E2E8F0;margin-bottom:6px">
+                  <div style="font-size:9px;font-weight:600;color:#94A3B8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Team</div>
+                  <div style="display:flex;flex-direction:column;gap:4px">
+                    <div style="display:flex;align-items:center;gap:6px;font-size:10px;color:#0F172A"><div style="width:18px;height:18px;border-radius:50%;background:#DBEAFE;color:#1D4ED8;font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center">PW</div>Patrick W.<div style="margin-left:auto;font-size:8px;background:#EFF6FF;color:#2563EB;padding:1px 5px;border-radius:4px">Owner</div></div>
+                    <div style="display:flex;align-items:center;gap:6px;font-size:10px;color:#0F172A"><div style="width:18px;height:18px;border-radius:50%;background:#DCFCE7;color:#15803D;font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center">KS</div>Kiera S.<div style="margin-left:auto;font-size:8px;background:#DCFCE7;color:#15803D;padding:1px 5px;border-radius:4px">Senior</div></div>
+                    <div style="display:flex;align-items:center;gap:6px;font-size:10px;color:#0F172A"><div style="width:18px;height:18px;border-radius:50%;background:#FEF3C7;color:#B45309;font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center">JR</div>James R.<div style="margin-left:auto;font-size:8px;background:#F1F5F9;color:#64748B;padding:1px 5px;border-radius:4px">Acct.</div></div>
+                    <div style="display:flex;align-items:center;gap:6px;font-size:10px;color:#0F172A"><div style="width:18px;height:18px;border-radius:50%;background:#EDE9FE;color:#6D28D9;font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center">RH</div>Reece H.<div style="margin-left:auto;font-size:8px;background:#F1F5F9;color:#64748B;padding:1px 5px;border-radius:4px">Admin</div></div>
+                  </div>
+                </div>
+                <div class="mock-nav-item active">📋 Workflow</div>
+                <div class="mock-nav-item">✓ Tasks</div>
+                <div class="mock-nav-item">📄 Documents</div>
+                <div class="mock-nav-item">📊 Activity</div>
+              </div>
+              <div class="mock-main">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+                  <div>
+                    <div class="mock-header">Sunrise Bakery Inc.</div>
+                    <div style="font-size:9px;color:#94A3B8">Corporation · Monthly · GST/HST — October 2025</div>
+                  </div>
+                  <span class="mock-badge b-amber">At Risk</span>
+                </div>
+                <div class="mock-alert alert-amber">⚑ Document blocker — Reminder #2 sent Oct 9. Stage 3 hard-blocked.</div>
+                <!-- Stage timeline -->
+                <div class="mock-stage-row"><div class="mock-stage-circle s-complete">✓</div><div style="flex:1"><div style="font-size:10px;font-weight:600">Stage 1: Bookkeeping</div><div style="font-size:9px;color:#94A3B8">Complete — Oct 2</div></div><span class="mock-badge b-green">Complete</span></div>
+                <div class="mock-stage-row"><div class="mock-stage-circle s-blocked">🔒</div><div style="flex:1"><div style="font-size:10px;font-weight:600">Stage 2: Document Collection</div><div style="font-size:9px;color:#94A3B8">Reminder #2 sent Oct 9</div><div class="mock-gate mock-gate-blocked">🔒 Hard Stop — 3 docs pending. Stage 3 cannot begin.</div></div><span class="mock-badge b-red">Blocked</span></div>
+                <div class="mock-stage-row"><div class="mock-stage-circle s-pending">3</div><div style="flex:1"><div style="font-size:10px;font-weight:600">Stage 3: Preparation</div><div class="mock-gate mock-gate-blocked">🔒 Blocked upstream — resolve document collection first.</div></div><span class="mock-badge b-gray">Pending</span></div>
+                <div class="mock-stage-row"><div class="mock-stage-circle s-pending">4</div><div style="flex:1"><div style="font-size:10px;font-weight:600">Stage 4: Review</div></div><span class="mock-badge b-gray">Pending</span></div>
+                <div class="mock-stage-row"><div class="mock-stage-circle s-pending">5</div><div style="flex:1"><div style="font-size:10px;font-weight:600">Stage 5: Filing</div><div class="mock-gate">🔒 Review approval required before filing</div></div><span class="mock-badge b-gray">Pending</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PHASE 3 -->
+  <div class="phase-content" id="phase-2">
+    <div class="phase-info">
+      <div class="phase-badge">✓ Live &nbsp;·&nbsp; Resend + pg_cron + R2</div>
+      <div class="phase-title">Automated reminders. Smart rules. R2 file storage.</div>
+      <p class="phase-desc">Phase 3 makes AcctOS sticky. Transactional email sequences run automatically — Day 3 reminder, Day 6 escalation, deadline alerts. Automation rules engine fires background jobs. Cloudflare R2 replaces Supabase Storage for zero egress cost at scale.</p>
+      <div class="feature-list">
+        <div class="feature-item"><div class="feature-check"><div class="feature-check-inner"></div></div><span class="feature-text"><strong>Automated document reminder sequence</strong> — Day 3: Reminder #1 to client. Day 6: Reminder #2 + escalate to firm owner. Deadline &lt; 5d: urgent alert.</span></div>
+        <div class="feature-item"><div class="feature-check"><div class="feature-check-inner"></div></div><span class="feature-text"><strong>5 automation rules</strong> — auto-create workflows, document reminders, escalation, deadline alerts, overdue flags — all configurable per firm</span></div>
+        <div class="feature-item"><div class="feature-check"><div class="feature-check-inner"></div></div><span class="feature-text"><strong>Cloudflare R2 storage</strong> — zero egress fees. 3-tier lifecycle: Standard (0–2yr) → Infrequent Access (2–4yr) → Archive (4–7yr, CRA requirement)</span></div>
+        <div class="feature-item"><div class="feature-check"><div class="feature-check-inner"></div></div><span class="feature-text"><strong>Dashboard intelligence</strong> — priority suggestions, GST anomaly detection (≥20% quarter-on-quarter change), risk trend per client</span></div>
+        <div class="feature-item"><div class="feature-check"><div class="feature-check-inner"></div></div><span class="feature-text"><strong>pg_cron background jobs</strong> — runs inside Supabase Postgres. No external queue until 50+ firms justify complexity. Zero added infra cost.</span></div>
+      </div>
+    </div>
+    <div>
+      <div class="screenshot-wrap">
+        <div class="screen-bar">
+          <div class="screen-dots"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div></div>
+          <div class="screen-url">app.acctos.com/settings/automation</div>
+        </div>
+        <div class="screen-body">
+          <div class="mock">
+            <div class="mock-layout">
+              <div class="mock-sidebar">
+                <div style="padding:10px 12px 8px;border-bottom:1px solid #E2E8F0;margin-bottom:6px;display:flex;align-items:center;gap:6px">
+                  <div style="width:22px;height:22px;background:#2563EB;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff">A</div>
+                  <div style="font-size:11px;font-weight:700;color:#0F172A">AcctOS</div>
+                </div>
+                <div class="mock-nav-item">⊞ Dashboard</div>
+                <div class="mock-nav-item">👥 Clients</div>
+                <div class="mock-nav-item">📅 Deadlines</div>
+                <div class="mock-nav-item active">⚙ Settings</div>
+                <div style="padding:8px 12px;margin-top:6px;border-top:1px solid #E2E8F0">
+                  <div style="font-size:9px;font-weight:600;color:#94A3B8;margin-bottom:6px">SETTINGS</div>
+                  <div style="font-size:10px;color:#2563EB;font-weight:600;padding:4px 6px;background:#EFF6FF;border-radius:5px;margin-bottom:3px">Automation</div>
+                  <div style="font-size:10px;color:#475569;padding:4px 6px">Email Templates</div>
+                  <div style="font-size:10px;color:#475569;padding:4px 6px">Billing</div>
+                  <div style="font-size:10px;color:#475569;padding:4px 6px">Team</div>
+                </div>
+              </div>
+              <div class="mock-main">
+                <div class="mock-header" style="margin-bottom:4px">Automation Rules</div>
+                <div class="mock-sub">5 rules active · all jobs running via pg_cron</div>
+                <div class="automation-rule"><div class="rule-dot rule-on"></div><div style="flex:1;font-size:10px;color:#0F172A;font-weight:500">Auto-create workflows at cycle start</div><div style="font-size:9px;color:#94A3B8">Monthly</div></div>
+                <div class="automation-rule"><div class="rule-dot rule-on"></div><div style="flex:1;font-size:10px;color:#0F172A;font-weight:500">Send document Reminder #1 after 3 days</div><div style="font-size:9px;color:#94A3B8">Day 3</div></div>
+                <div class="automation-rule"><div class="rule-dot rule-on"></div><div style="flex:1;font-size:10px;color:#0F172A;font-weight:500">Escalate to owner on Reminder #2</div><div style="font-size:9px;color:#F59E0B">Day 6 ⚑</div></div>
+                <div class="automation-rule"><div class="rule-dot rule-on"></div><div style="flex:1;font-size:10px;color:#0F172A;font-weight:500">Deadline alert 3 days before CRA due date</div><div style="font-size:9px;color:#DC2626">−3d ⚑</div></div>
+                <div class="automation-rule"><div class="rule-dot rule-on"></div><div style="flex:1;font-size:10px;color:#0F172A;font-weight:500">Flag overdue clients on dashboard</div><div style="font-size:9px;color:#94A3B8">Daily</div></div>
+                <div style="margin-top:10px;padding:8px;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:6px">
+                  <div style="font-size:10px;font-weight:600;color:#15803D;margin-bottom:4px">📧 Email log — Sunrise Bakery</div>
+                  <div style="font-size:9px;color:#166534;margin-bottom:2px">✓ Initial request — Oct 3</div>
+                  <div style="font-size:9px;color:#166534;margin-bottom:2px">✓ Reminder #1 — Oct 6</div>
+                  <div style="font-size:9px;color:#166534">✓ Reminder #2 + Owner escalation — Oct 9</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PHASE 4 -->
+  <div class="phase-content" id="phase-3">
+    <div class="phase-info">
+      <div class="phase-badge">✓ Live &nbsp;·&nbsp; QBO + Stripe + Client Portal</div>
+      <div class="phase-title">QuickBooks sync. Client portal. Billing triggers.</div>
+      <p class="phase-desc">Phase 4 plugs AcctOS into real firm workflows. When QuickBooks Online marks a period reconciled, Stage 1 advances automatically — no manual confirmation needed. Clients upload documents through a tokenised portal. Filing completion triggers a Stripe invoice.</p>
+      <div class="feature-list">
+        <div class="feature-item"><div class="feature-check"><div class="feature-check-inner"></div></div><span class="feature-text"><strong>QuickBooks Online OAuth</strong> — reconciliation webhook auto-advances Stage 1 gate. Zoho Books supported as alternative.</span></div>
+        <div class="feature-item"><div class="feature-check"><div class="feature-check-inner"></div></div><span class="feature-text"><strong>Client portal (no login required)</strong> — tokenised URL sent to client. They see pending docs, upload directly, and the checklist auto-updates in AcctOS.</span></div>
+        <div class="feature-item"><div class="feature-check"><div class="feature-check-inner"></div></div><span class="feature-text"><strong>Stripe billing</strong> — Starter $49/mo · Growth $149/mo · Scale $299/mo (all CAD, firm-flat). Stage 6 completion triggers invoice automatically.</span></div>
+        <div class="feature-item"><div class="feature-check"><div class="feature-check-inner"></div></div><span class="feature-text"><strong>Payroll Remittances template</strong> — monthly and bi-weekly cycles. CRA payroll deadlines built in. Same engine, new configuration.</span></div>
+        <div class="feature-item"><div class="feature-check"><div class="feature-check-inner"></div></div><span class="feature-text"><strong>Full webhook suite</strong> — QBO reconciliation events, Zoho Books events, Stripe subscription lifecycle, Resend delivery events.</span></div>
+      </div>
+    </div>
+    <div>
+      <div class="screenshot-wrap">
+        <div class="screen-bar">
+          <div class="screen-dots"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div></div>
+          <div class="screen-url">app.acctos.com/settings/integrations</div>
+        </div>
+        <div class="screen-body">
+          <div class="mock">
+            <div class="mock-layout">
+              <div class="mock-sidebar">
+                <div style="padding:10px 12px 8px;border-bottom:1px solid #E2E8F0;margin-bottom:6px;display:flex;align-items:center;gap:6px">
+                  <div style="width:22px;height:22px;background:#2563EB;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff">A</div>
+                  <div style="font-size:11px;font-weight:700;color:#0F172A">AcctOS</div>
+                </div>
+                <div style="padding:8px 12px;margin-top:4px">
+                  <div style="font-size:9px;font-weight:600;color:#94A3B8;margin-bottom:6px">SETTINGS</div>
+                  <div style="font-size:10px;color:#475569;padding:4px 6px">Firm Profile</div>
+                  <div style="font-size:10px;color:#2563EB;font-weight:600;padding:4px 6px;background:#EFF6FF;border-radius:5px;margin-bottom:3px">Integrations</div>
+                  <div style="font-size:10px;color:#475569;padding:4px 6px">Client Portal</div>
+                  <div style="font-size:10px;color:#475569;padding:4px 6px">Billing</div>
+                  <div style="font-size:10px;color:#475569;padding:4px 6px">Automation</div>
+                  <div style="font-size:10px;color:#475569;padding:4px 6px">Team</div>
+                </div>
+              </div>
+              <div class="mock-main">
+                <div class="mock-header" style="margin-bottom:10px">Integrations</div>
+                <div class="mock-integration">
+                  <div class="mock-int-logo int-qbo">QB</div>
+                  <div class="mock-int-info">
+                    <div class="mock-int-name">QuickBooks Online</div>
+                    <div class="mock-int-status">Jensen &amp; Associates — Connected · Last sync Oct 14</div>
+                  </div>
+                  <span class="mock-badge b-green">Connected</span>
+                </div>
+                <div class="mock-integration">
+                  <div class="mock-int-logo int-stripe">St</div>
+                  <div class="mock-int-info">
+                    <div class="mock-int-name">Stripe Billing</div>
+                    <div class="mock-int-status">Growth plan active · $149/mo CAD</div>
+                  </div>
+                  <span class="mock-badge b-green">Active</span>
+                </div>
+                <div class="mock-integration">
+                  <div class="mock-int-logo int-r2">R2</div>
+                  <div class="mock-int-info">
+                    <div class="mock-int-name">Cloudflare R2 Storage</div>
+                    <div class="mock-int-status">Zero egress · 3-tier lifecycle · CRA 7yr retention</div>
+                  </div>
+                  <span class="mock-badge b-green">Active</span>
+                </div>
+                <div class="mock-integration">
+                  <div class="mock-int-logo int-zoho">Zh</div>
+                  <div class="mock-int-info">
+                    <div class="mock-int-name">Zoho Books</div>
+                    <div class="mock-int-status">Alternative to QBO — not connected</div>
+                  </div>
+                  <span class="mock-badge b-gray">Available</span>
+                </div>
+                <div style="margin-top:10px;padding:8px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:6px;font-size:9px;color:#1D4ED8">
+                  🔗 <strong>Client Portal active</strong> — tokenised links sent for 3 clients this month. Maple Contracting uploaded 4/4 docs via portal.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- FEATURES GRID -->
+<section>
+  <div class="section-label">Built for Canada</div>
+  <div class="section-title">Every rule the CRA expects,<br>built into the engine</div>
+  <div class="features-grid">
+    <div class="feat-card">
+      <div class="feat-icon">📅</div>
+      <div class="feat-title">CRA deadlines native</div>
+      <div class="feat-desc">Monthly, quarterly, and annual CRA deadlines built in. Ontario timezone. No manual configuration. Monthly filers: last day of following month. Quarterly: last day of month after quarter-end.</div>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">🔒</div>
+      <div class="feat-title">Gate enforcement</div>
+      <div class="feat-desc">Stage 3 cannot begin until all documents are received. Filing is blocked until review is approved. Hard stops with specific reasons — not just visual warnings, but database-level prevention.</div>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">⚡</div>
+      <div class="feat-title">5-condition risk engine</div>
+      <div class="feat-desc">C1 timeline breach · C2 deadline proximity · C3 document blocker · C4 stage stall · C5 risk history. Evaluated per workflow. Status is computed dynamically — never stored, never stale.</div>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">🏢</div>
+      <div class="feat-title">Corp vs sole prop branching</div>
+      <div class="feat-desc">Corporation: ITC reconciliation added to Stage 3. Dual review gate if GST &gt; $10,000. Sole proprietor: simplified checklist, revenue threshold check, no ITCs required.</div>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">📧</div>
+      <div class="feat-title">Automated escalation</div>
+      <div class="feat-desc">Document requests go out automatically. Day 3: Reminder #1. Day 6: Reminder #2 + owner escalation. Deadline &lt; 5 days: urgent alert. Full email log per client, per filing.</div>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">🛡️</div>
+      <div class="feat-title">Row Level Security</div>
+      <div class="feat-desc">Every database query scoped to firm_id at the Postgres level via Supabase RLS. A bug in application code cannot leak data between firms. PIPEDA-compliant. Data in ca-central-1.</div>
+    </div>
+  </div>
+</section>
+
+<!-- COMPARISON TABLE -->
+<div style="max-width:1200px;margin:0 auto;padding:0 40px 72px" id="compare">
+  <div class="section-label">Why AcctOS</div>
+  <div class="section-title">Built for Canada. Not adapted.</div>
+  <div class="comp-wrap">
+    <table class="comp-table">
+      <thead>
+        <tr>
+          <th>Feature</th>
+          <th>Uku</th>
+          <th>TaxDome</th>
+          <th class="hl">AcctOS</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>CRA deadlines native</td><td>Manual setup</td><td>Generic</td><td class="hl"><span class="check-yes">✓</span> Built in</td></tr>
+        <tr><td>5-condition At Risk algorithm</td><td>Simple overdue</td><td>Basic flag</td><td class="hl"><span class="check-yes">✓</span> Per workflow</td></tr>
+        <tr><td>Gate enforcement with reasons</td><td><span class="check-no">—</span></td><td><span class="check-no">—</span></td><td class="hl"><span class="check-yes">✓</span> Hard stops</td></tr>
+        <tr><td>Corp vs sole prop branching</td><td><span class="check-no">—</span></td><td><span class="check-no">—</span></td><td class="hl"><span class="check-yes">✓</span> Automatic</td></tr>
+        <tr><td>Automated document reminders</td><td>Manual</td><td>Basic</td><td class="hl"><span class="check-yes">✓</span> Escalation seq.</td></tr>
+        <tr><td>QuickBooks Online integration</td><td>Add-on</td><td>Limited</td><td class="hl"><span class="check-yes">✓</span> Stage 1 auto</td></tr>
+        <tr><td>Client upload portal</td><td>Paid add-on</td><td>Yes</td><td class="hl"><span class="check-yes">✓</span> Token-gated</td></tr>
+        <tr><td>Pricing (Ontario firms)</td><td>$49+ USD/user</td><td>$99+ USD/user</td><td class="hl"><span class="check-yes">✓</span> Flat CAD</td></tr>
+        <tr><td>Setup time</td><td>Days</td><td>Hours</td><td class="hl"><span class="check-yes">✓</span> Minutes</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- CTA -->
+<div style="max-width:1200px;margin:0 auto;padding:0 40px 72px" id="cta">
+  <div class="cta-section">
+    <div style="display:inline-flex;align-items:center;gap:8px;background:rgba(13,148,136,0.15);border:1px solid rgba(13,148,136,0.3);border-radius:20px;padding:5px 14px;font-size:12px;color:var(--teal3);font-weight:600;margin-bottom:20px;letter-spacing:.04em">Phases 0–4 production-ready</div>
+    <div class="cta-title">The product is built.<br>Let's get your firm live.</div>
+    <div class="cta-sub">60-day pilot, no credit card. Your real clients, your workflows, your deadlines. Live in an afternoon.</div>
+    <div class="cta-buttons">
+      <button class="btn-primary">Start free 60-day pilot →</button>
+      <button class="btn-outline">Book a 30-minute demo</button>
+    </div>
+    <div style="margin-top:24px;display:flex;justify-content:center;gap:32px;flex-wrap:wrap">
+      <div style="font-size:12px;color:var(--slate)">✓ No credit card required</div>
+      <div style="font-size:12px;color:var(--slate)">✓ Canadian data residency (ca-central-1)</div>
+      <div style="font-size:12px;color:var(--slate)">✓ PIPEDA compliant</div>
+      <div style="font-size:12px;color:var(--slate)">✓ Cancel any time</div>
+    </div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<div style="border-top:1px solid rgba(255,255,255,0.06)">
+<div style="max-width:1200px;margin:0 auto;padding:28px 40px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px">
+  <div style="display:flex;align-items:center;gap:8px">
+    <div class="logo-mark" style="width:26px;height:26px;font-size:13px">A</div>
+    <span style="font-family:'Playfair Display',serif;font-size:15px;font-weight:700">AcctOS</span>
+    <span style="font-size:11px;color:var(--slate);margin-left:8px">Canadian Accounting Operations</span>
+  </div>
+  <div style="display:flex;gap:20px">
+    <a href="#" style="font-size:12px;color:var(--slate);text-decoration:none">Privacy</a>
+    <a href="#" style="font-size:12px;color:var(--slate);text-decoration:none">Terms</a>
+    <a href="#" style="font-size:12px;color:var(--slate);text-decoration:none">Security</a>
+    <a href="#" style="font-size:12px;color:var(--slate);text-decoration:none">API Docs</a>
+  </div>
+  <div style="font-size:11px;color:var(--slate)">© 2025 AcctOS · Vercel + Supabase · Ontario, Canada</div>
+</div>
+</div>
+
+<script>
+function showPhase(n) {
+  document.querySelectorAll('.phase-tab').forEach((t,i) => t.classList.toggle('active', i===n));
+  document.querySelectorAll('.phase-content').forEach((c,i) => c.classList.toggle('active', i===n));
+}
+</script>
