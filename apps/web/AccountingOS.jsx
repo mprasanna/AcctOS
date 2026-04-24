@@ -119,22 +119,27 @@ function useClients() {
         if (json.data) {
           const mapped = json.data.map(c => ({
             ...c,
+            // Map snake_case API fields to camelCase expected by the UI
             daysToDeadline: c.days_to_deadline,
-            activeWf: {
+            score: c.risk_score,
+            assigned: c.assigned_to,
+            activeWf: c.active_workflow ? {
               ...c.active_workflow,
+              stages: c.active_workflow.stages ?? [],
               computed: {
-                status: c.active_workflow?.computed_status,
-                flags: c.active_workflow?.computed_flags,
+                status: c.active_workflow.computed_status,
+                flags:  c.active_workflow.computed_flags ?? [],
               },
-              stages: c.active_workflow?.stages ?? [],
-            },
+              daysToDeadline: c.active_workflow.days_to_deadline,
+            } : null,
             workflows: (c.workflows ?? []).map(wf => ({
               ...wf,
               computed: {
                 status: wf.computed_status,
-                flags: wf.computed_flags,
-              }
-            }))
+                flags:  wf.computed_flags ?? [],
+              },
+              daysToDeadline: wf.days_to_deadline,
+            })),
           }))
           setClients(mapped)
         }
