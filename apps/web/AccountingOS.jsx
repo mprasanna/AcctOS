@@ -366,7 +366,7 @@ function wfRiskScore(wc, client) {
   return s;
 }
 
-function useClients() {
+function useClients(refreshKey = 0) {
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState(null);
@@ -433,7 +433,7 @@ function useClients() {
         setError(err.message);
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [refreshKey]);
 
   return { clients, loading, error };
 }
@@ -823,28 +823,72 @@ function ClientList({ clients, onSelect }) {
 }
 
 // ─── WORKFLOW TAB (with live stage advancement) ───────────────────────────────
-function WorkflowTab({ wf, wfComputed, client, stageCfg }) {
-  const [stageData, setStageData] = useState(() => wf.stages.map(s => ({...s})));
+function WorkflowTab({ wf, wfComputed, client, stageCfg, onRefresh }) {
+  const [stageData, setStageData] = useState(() => (wf.stages||[]).map(s => ({...s})));
   const [confirmInput, setConfirmInput] = useState("");
-  const [advanced, setAdvanced] = useState(null); // last advanced stage n
+  const [saving, setSaving] = useState(null); // stageN being saved
+  const [saveError, setSaveError] = useState(null);
+  const [advanced, setAdvanced] = useState(null);
 
   // Reset when workflow changes
   const wfId = wf.id;
   const [lastWfId, setLastWfId] = useState(wfId);
-  if (wfId !== lastWfId) { setStageData(wf.stages.map(s => ({...s}))); setLastWfId(wfId); setAdvanced(null); }
+  if (wfId !== lastWfId) {
+    setStageData((wf.stages||[]).map(s => ({...s})));
+    setLastWfId(wfId); setAdvanced(null); setSaveError(null);
+  }
 
-  function advanceStage(stageN) {
-    setStageData(prev => prev.map(s => {
-      if (s.n === stageN)     return {...s, status:"complete",    date:`Oct ${14 + stageN}`};
-      if (s.n === stageN + 1) return {...s, status:"in_progress", date:`Oct ${14 + stageN}`};
-      return s;
-    }));
-    setAdvanced(stageN);
-    setConfirmInput("");
+  async function advanceStage(stageN, opts={}) {
+    const stage = stageData.find(s => s.n === stageN);
+    if (!stage?.id) {
+      setSaveError("Stage ID missing — data may not have loaded from DB yet.");
+      return;
+    }
+    setSaving(stageN);
+    setSaveError(null);
+    try {
+      const body = { status: "complete" };
+      if (opts.cra_confirmation) body.cra_confirmation = opts.cra_confirmation;
+      if (opts.dual_review_confirmed) body.dual_review_confirmed = true;
+
+      const res = await fetch(`/api/stages/${stage.id}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setSaveError(data.gate_reason || data.error || "Failed to advance stage.");
+        return;
+      }
+
+      // Optimistic update while refetch happens
+      setStageData(prev => prev.map(s => {
+        if (s.n === stageN)     return {...s, status:"complete"};
+        if (s.n === stageN + 1) return {...s, status:"in_progress"};
+        return s;
+      }));
+      setAdvanced(stageN);
+      setConfirmInput("");
+
+      // Refetch clients so dashboard + status badges update
+      if (onRefresh) onRefresh();
+    } catch(e) {
+      setSaveError("Network error — check your connection.");
+    } finally {
+      setSaving(null);
+    }
   }
 
   if ((stageData||[]).length === 0)
-    return <div style={{ background:"#F8FAFC", borderRadius:8, padding:"20px", textAlign:"center", color:C.muted, fontSize:12 }}>Stage detail not available for this workflow type yet</div>;
+    return (
+      <div style={{ background:C.amberBg, border:`1px solid #FCD34D`, borderRadius:8, padding:"16px 20px", textAlign:"center" }}>
+        <div style={{ fontSize:13, fontWeight:600, color:C.amber, marginBottom:4 }}>⚠ No stage data loaded from database</div>
+        <div style={{ fontSize:12, color:C.muted }}>This workflow has no stages in Supabase yet. Create the workflow via POST /api/workflows to auto-generate stages from the template.</div>
+      </div>
+    );
 
   return (
     <div>
@@ -855,26 +899,38 @@ function WorkflowTab({ wf, wfComputed, client, stageCfg }) {
 
       {advanced !== null && (
         <div style={{ background:C.greenBg, border:"1px solid #BBF7D0", borderRadius:8, padding:"9px 14px", marginBottom:14, display:"flex", alignItems:"center", gap:8 }}>
-          <span style={{ fontSize:13 }}>✓</span>
-          <span style={{ fontSize:13, color:"#14532D", fontWeight:500 }}>Stage {advanced} completed — Stage {advanced + 1} is now active</span>
-          <span style={{ fontSize:12, color:"#16A34A", marginLeft:"auto" }}>Activity logged</span>
+          <span>✓</span>
+          <span style={{ fontSize:13, color:"#14532D", fontWeight:500 }}>Stage {advanced} completed — Stage {advanced+1} is now active</span>
+          <span style={{ fontSize:12, color:C.green, marginLeft:"auto" }}>Saved to DB</span>
+        </div>
+      )}
+
+      {saveError && (
+        <div style={{ background:C.redBg, border:"1px solid #FCA5A5", borderRadius:8, padding:"9px 14px", marginBottom:14, fontSize:13, color:C.red }}>
+          🔒 {saveError}
+        </div>
+      )}
+
+      {!wf.id && (
+        <div style={{ background:C.amberBg, border:`1px solid #FCD34D`, borderRadius:8, padding:"9px 14px", marginBottom:14, fontSize:12, color:C.amber }}>
+          ⚠ This workflow has no database ID — stage advancement is disabled. Ensure data comes from /api/clients.
         </div>
       )}
 
       {stageData.map((s, i) => {
-        const cfg  = stageCfg[s.status] || stageCfg.pending;
-        const gate = evaluateGate(s, {...wf, stages: stageData}, client);
+        const cfg      = stageCfg[s.status] || stageCfg.pending;
+        const gate     = evaluateGate(s, {...wf, stages: stageData}, client);
         const isActive = s.status === "in_progress";
-        const actor = getStageActor(s.n, client);
-        const isLastStage = s.n === 6;
+        const actor    = getStageActor(s.n, client);
+        const isSaving = saving === s.n;
 
         return (
-          <div key={i} style={{ display:"flex" }}>
+          <div key={s.id || i} style={{ display:"flex" }}>
             <div style={{ display:"flex", flexDirection:"column", alignItems:"center", marginRight:14, width:24 }}>
-              <div style={{ width:24, height:24, borderRadius:"50%", background:cfg.bg, border:`2px solid ${cfg.color}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:10, color:cfg.color, fontWeight:700, flexShrink:0, transition:"all 0.2s" }}>
-                {s.status==="complete"?"✓":s.status==="missed"?"✕":s.status==="blocked"?"🔒":i+1}
+              <div style={{ width:24, height:24, borderRadius:"50%", background:cfg.bg, border:`2px solid ${cfg.color}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:10, color:cfg.color, fontWeight:700, flexShrink:0 }}>
+                {isSaving ? "…" : s.status==="complete"?"✓":s.status==="missed"?"✕":s.status==="blocked"?"🔒":i+1}
               </div>
-              {i < stageData.length - 1 && <div style={{ width:2, flex:1, minHeight:14, background:s.status==="complete"?C.green:C.border, margin:"2px 0", transition:"background 0.3s" }} />}
+              {i < stageData.length-1 && <div style={{ width:2, flex:1, minHeight:14, background:s.status==="complete"?C.green:C.border, margin:"2px 0" }} />}
             </div>
 
             <div style={{ flex:1, paddingBottom:16, paddingTop:2 }}>
@@ -883,27 +939,28 @@ function WorkflowTab({ wf, wfComputed, client, stageCfg }) {
                 <Pill label={cfg.label} bg={cfg.bg} color={cfg.color} />
               </div>
               {s.date && <div style={{ fontSize:11, color:C.muted, marginTop:2 }}>{s.date}</div>}
-              {wf.stageNotes?.[i+1] && <div style={{ fontSize:11, color:C.primary, marginTop:2 }}>↳ {wf.stageNotes[i+1]}</div>}
-              {s.gateLabel && <div style={{ fontSize:11, color:C.slate, marginTop:3 }}>🔒 {s.gateLabel}</div>}
+              {s.note && <div style={{ fontSize:11, color:C.primary, marginTop:2 }}>↳ {s.note}</div>}
+              {s.gate_label && <div style={{ fontSize:11, color:C.slate, marginTop:3 }}>🔒 {s.gate_label}</div>}
               <GateBanner gate={gate} />
 
-              {/* ── ACTION FOOTER — only on the active, unblocked stage ── */}
-              {isActive && !gate?.locked && !isLastStage && (
+              {/* ACTION FOOTER — active, unblocked, not stage 6 */}
+              {isActive && !gate?.locked && s.n < 6 && (
                 <div style={{ marginTop:10, background:"#F0FDF4", border:"1px solid #BBF7D0", borderRadius:8, padding:"10px 14px" }}>
                   <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
                     <div>
                       <div style={{ fontSize:12, fontWeight:600, color:"#14532D", marginBottom:2 }}>{actor.action}</div>
                       <div style={{ fontSize:11, color:"#16A34A" }}>👤 {actor.role} · {actor.who}</div>
+                      {!s.id && <div style={{ fontSize:10, color:C.amber, marginTop:2 }}>⚠ No DB id — will not save</div>}
                     </div>
-                    <button onClick={() => advanceStage(s.n)}
-                      style={{ background:C.green, color:"white", border:"none", borderRadius:8, padding:"8px 16px", fontSize:13, fontWeight:600, cursor:"pointer", whiteSpace:"nowrap" }}>
-                      Complete Stage {s.n} →
+                    <button onClick={() => advanceStage(s.n)} disabled={isSaving || !s.id}
+                      style={{ background:isSaving?"#D1FAE5":C.green, color:"white", border:"none", borderRadius:8, padding:"8px 16px", fontSize:13, fontWeight:600, cursor:isSaving||!s.id?"not-allowed":"pointer", opacity:isSaving?0.7:1 }}>
+                      {isSaving ? "Saving…" : `Complete Stage ${s.n} →`}
                     </button>
                   </div>
                 </div>
               )}
 
-              {/* Stage 6 — confirmation number input */}
+              {/* Stage 6 — CRA confirmation */}
               {isActive && s.n === 6 && !gate?.locked && (
                 <div style={{ marginTop:10, background:"#F0FDF4", border:"1px solid #BBF7D0", borderRadius:8, padding:"10px 14px" }}>
                   <div style={{ fontSize:12, fontWeight:600, color:"#14532D", marginBottom:8 }}>Record CRA confirmation number to close workflow</div>
@@ -911,13 +968,13 @@ function WorkflowTab({ wf, wfComputed, client, stageCfg }) {
                     <input value={confirmInput} onChange={e => setConfirmInput(e.target.value)}
                       placeholder="e.g. RT2025-48291"
                       style={{ flex:1, padding:"7px 12px", borderRadius:8, border:`1px solid ${C.border}`, fontSize:13, outline:"none" }} />
-                    <button onClick={() => confirmInput.trim() && advanceStage(6)}
-                      disabled={!confirmInput.trim()}
-                      style={{ background:confirmInput.trim()?C.green:"#D1FAE5", color:confirmInput.trim()?"white":"#6EE7B7", border:"none", borderRadius:8, padding:"7px 16px", fontSize:13, fontWeight:600, cursor:confirmInput.trim()?"pointer":"not-allowed" }}>
-                      Close Workflow ✓
+                    <button onClick={() => confirmInput.trim() && advanceStage(6, { cra_confirmation: confirmInput.trim() })}
+                      disabled={!confirmInput.trim() || isSaving || !s.id}
+                      style={{ background:confirmInput.trim()&&!isSaving?C.green:"#D1FAE5", color:confirmInput.trim()&&!isSaving?"white":"#6EE7B7", border:"none", borderRadius:8, padding:"7px 16px", fontSize:13, fontWeight:600, cursor:confirmInput.trim()&&!isSaving&&s.id?"pointer":"not-allowed" }}>
+                      {isSaving ? "Saving…" : "Close Workflow ✓"}
                     </button>
                   </div>
-                  <div style={{ fontSize:11, color:"#16A34A", marginTop:6 }}>👤 Accountant · {USERS[client.assigned]?.initials}</div>
+                  <div style={{ fontSize:11, color:"#16A34A", marginTop:6 }}>👤 Accountant · {client.assigned_user?.initials || client.assigned}</div>
                 </div>
               )}
             </div>
@@ -928,8 +985,194 @@ function WorkflowTab({ wf, wfComputed, client, stageCfg }) {
   );
 }
 
+// ─── TASKS TAB (wired to DB) ──────────────────────────────────────────────────
+function TasksTab({ wf, onRefresh }) {
+  const [tasks, setTasks] = useState(wf.tasks || []);
+  const [saving, setSaving] = useState(null);
+
+  // Sync if wf changes
+  const wfId = wf.id;
+  const [lastId, setLastId] = useState(wfId);
+  if (wfId !== lastId) { setTasks(wf.tasks || []); setLastId(wfId); }
+
+  async function toggleTask(task) {
+    if (!task.id) return; // no DB id — do nothing
+    const newStatus = task.status === "complete" ? "in_progress" : "complete";
+    setSaving(task.id);
+    try {
+      const res = await fetch(`/api/tasks/${task.id}`, {
+        method: "PATCH", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (res.ok) {
+        setTasks(prev => prev.map(t => t.id === task.id ? {...t, status: newStatus} : t));
+        if (onRefresh) onRefresh();
+      }
+    } finally { setSaving(null); }
+  }
+
+  const tcfg = { complete:[C.greenBg,C.green], in_progress:[C.primaryBg,C.primary], pending:["#F1F5F9",C.muted], blocked:[C.redBg,C.red], missed:[C.redBg,C.red] };
+
+  if (!tasks.length)
+    return <div style={{ background:C.amberBg, border:`1px solid #FCD34D`, borderRadius:8, padding:"16px 20px", fontSize:12, color:C.amber }}>⚠ No tasks loaded from database for this workflow.</div>;
+
+  return (
+    <Card>
+      {tasks.map((task, i) => {
+        const [tbg, tc] = tcfg[task.status] || tcfg.pending;
+        const isSaving  = saving === task.id;
+        const assignee  = task.assigned_user?.name || task.assigned_initials || task.who || "—";
+        return (
+          <div key={task.id || i} style={{ padding:"10px 16px", borderBottom:i<tasks.length-1?`1px solid ${C.border}`:"none", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+            <div style={{ display:"flex", alignItems:"flex-start", gap:10, flex:1 }}>
+              <button onClick={() => toggleTask(task)} disabled={isSaving || !task.id}
+                style={{ width:18, height:18, borderRadius:4, border:`2px solid ${task.status==="complete"?C.green:C.border}`, background:task.status==="complete"?C.green:"white", cursor:task.id?"pointer":"not-allowed", flexShrink:0, marginTop:2, display:"flex", alignItems:"center", justifyContent:"center" }}>
+                {task.status==="complete" && <span style={{ color:"white", fontSize:10, fontWeight:700 }}>✓</span>}
+                {isSaving && <span style={{ color:C.muted, fontSize:9 }}>…</span>}
+              </button>
+              <div>
+                <div style={{ fontSize:13, fontWeight:500, color:task.status==="complete"?C.muted:C.text, textDecoration:task.status==="complete"?"line-through":"none" }}>{task.title}</div>
+                <div style={{ fontSize:11, color:C.muted, marginTop:2 }}>
+                  👤 {assignee}{task.due_date||task.due ? ` · 📅 Due ${task.due_date||task.due}` : ""}
+                  {!task.id && <span style={{ color:C.amber, marginLeft:6 }}>⚠ no DB id</span>}
+                </div>
+              </div>
+            </div>
+            <Pill label={task.status.replace("_"," ")} bg={tbg} color={tc} />
+          </div>
+        );
+      })}
+    </Card>
+  );
+}
+
+// ─── DOCUMENTS TAB (wired to DB) ─────────────────────────────────────────────
+function DocumentsTab({ wf, client, onRefresh }) {
+  const [docs, setDocs] = useState(wf.docs || wf.documents || []);
+  const [saving, setSaving] = useState(null);
+  const [emailLog, setEmailLog] = useState(client.emailLog || []);
+
+  const wfId = wf.id;
+  const [lastId, setLastId] = useState(wfId);
+  if (wfId !== lastId) { setDocs(wf.docs || wf.documents || []); setLastId(wfId); }
+
+  async function markReceived(doc) {
+    if (!doc.id) return;
+    setSaving(doc.id);
+    try {
+      const res = await fetch(`/api/documents/${doc.id}`, {
+        method: "PATCH", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "received", upload_source: "Manual" }),
+      });
+      if (res.ok) {
+        setDocs(prev => prev.map(d => d.id === doc.id ? {...d, status:"received", uploaded_at: new Date().toLocaleDateString("en-CA",{month:"short",day:"numeric"})} : d));
+        if (onRefresh) onRefresh();
+      }
+    } finally { setSaving(null); }
+  }
+
+  const pendingCount = docs.filter(d => d.status === "pending").length;
+
+  return (
+    <div>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}>
+        <div style={{ fontSize:13, fontWeight:600, color:C.text }}>Document Checklist — {wf.label}</div>
+        <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+          {pendingCount > 0 && <Pill label={`${pendingCount} pending`} bg={C.amberBg} color={C.amber} />}
+          <Btn variant="primary">+ Send Request</Btn>
+        </div>
+      </div>
+      <div style={{ background:"#F0F9FF", border:"1px solid #BAE6FD", borderRadius:8, padding:"10px 14px", marginBottom:14, fontSize:12, color:"#0369A1" }}>
+        {client.type==="Corporation"
+          ? "🔒 Corporation checklist: bank statements, AR/AP aging, invoices, receipts >$500, ITC reconciliation"
+          : "🔒 Sole prop checklist: bank statements, all sales invoices, receipts >$100, GST registration (new clients)"}
+      </div>
+      {!docs.length
+        ? <div style={{ background:C.amberBg, border:`1px solid #FCD34D`, borderRadius:8, padding:"16px", fontSize:12, color:C.amber }}>⚠ No documents loaded from database for this workflow.</div>
+        : (
+          <Card>
+            {docs.map((doc, i) => (
+              <div key={doc.id || i} style={{ padding:"10px 16px", borderBottom:i<docs.length-1?`1px solid ${C.border}`:"none", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                <div>
+                  <div style={{ fontSize:13, color:C.text }}>{doc.name}</div>
+                  <div style={{ fontSize:11, color:C.muted, marginTop:1 }}>
+                    {doc.status==="received"
+                      ? `Uploaded ${doc.uploaded_at||doc.uploadedAt||"—"}${doc.upload_source||doc.by?" · "+(doc.upload_source||doc.by):""}`
+                      : `Reminder #${doc.reminder_count??doc.reminderCount??0} sent ${doc.last_reminder_at||doc.lastReminderAt||"—"}`}
+                    {!doc.id && <span style={{ color:C.amber, marginLeft:6 }}>⚠ no DB id</span>}
+                  </div>
+                </div>
+                <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                  {doc.status==="pending" && doc.id && (
+                    <button onClick={() => markReceived(doc)} disabled={saving===doc.id}
+                      style={{ fontSize:11, color:C.green, background:C.greenBg, border:`1px solid #BBF7D0`, borderRadius:6, padding:"3px 10px", cursor:"pointer" }}>
+                      {saving===doc.id ? "…" : "Mark Received"}
+                    </button>
+                  )}
+                  <Pill label={doc.status==="received"?"Received":"Pending"} bg={doc.status==="received"?C.greenBg:C.amberBg} color={doc.status==="received"?C.green:C.amber} />
+                </div>
+              </div>
+            ))}
+          </Card>
+        )
+      }
+      {emailLog.length > 0 && (
+        <div style={{ marginTop:14, background:C.amberBg, border:"1px solid #FCD34D", borderRadius:8, padding:"12px 16px" }}>
+          <div style={{ fontSize:12, fontWeight:600, color:C.amber, marginBottom:8 }}>Email Escalation Log</div>
+          {emailLog.map((e, i) => (
+            <div key={i} style={{ fontSize:12, color:"#92400E", marginBottom:4, display:"flex", gap:8 }}>
+              <span style={{ color:C.green }}>✓</span>{e.type||e} — Sent {e.date||""}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── ACTIVITY TAB (fetches from DB) ──────────────────────────────────────────
+function ActivityTab({ clientId }) {
+  const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!clientId) { setLoading(false); return; }
+    fetch(`/api/clients/${clientId}/events`, { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(json => { if (json?.data) setEvents(json.data); })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [clientId]);
+
+  if (loading) return <div style={{ padding:"20px", textAlign:"center", color:C.muted, fontSize:13 }}>Loading activity…</div>;
+
+  // Fallback: if no clientId or endpoint missing, show helpful message
+  if (!clientId) return <div style={{ background:C.amberBg, border:`1px solid #FCD34D`, borderRadius:8, padding:"16px", fontSize:12, color:C.amber }}>⚠ Client ID missing — cannot load activity.</div>;
+
+  if (!events.length) return <div style={{ padding:"20px", textAlign:"center", color:C.muted, fontSize:13 }}>No activity logged yet for this client.</div>;
+
+  return (
+    <div>
+      <div style={{ fontSize:13, fontWeight:600, color:C.text, marginBottom:14 }}>Activity Feed</div>
+      <div style={{ position:"relative", paddingLeft:24 }}>
+        <div style={{ position:"absolute", left:8, top:0, bottom:0, width:2, background:C.border }} />
+        {events.map((a, i) => (
+          <div key={a.id || i} style={{ position:"relative", marginBottom:16 }}>
+            <div style={{ position:"absolute", left:-20, top:2, width:10, height:10, borderRadius:"50%", background:a.who==="System"?C.border:C.primary, border:"2px solid white" }} />
+            <div style={{ fontSize:12, fontWeight:600, color:C.text }}>{a.action||a.act}</div>
+            <div style={{ fontSize:11, color:C.muted, marginTop:1 }}>{a.detail}</div>
+            <div style={{ fontSize:11, color:C.slate, marginTop:2 }}>{a.who} · {a.created_at ? new Date(a.created_at).toLocaleString("en-CA",{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"}) : a.t}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── CLIENT WORKSPACE ────────────────────────────────────────────────────────
-function ClientWorkspace({ client, onBack }) {
+function ClientWorkspace({ client, onBack, onRefresh }) {
   const [tab, setTab] = useState("workflow");
   const [wfIdx, setWfIdx] = useState(0);
   const wf = client.workflows[wfIdx];
@@ -1016,96 +1259,22 @@ function ClientWorkspace({ client, onBack }) {
 
       {/* WORKFLOW TAB — with gate enforcement + stage advancement */}
       {tab==="workflow" && wf && (
-        <WorkflowTab wf={wf} wfComputed={wfComputed} client={client} stageCfg={stageCfg} />
+        <WorkflowTab wf={wf} wfComputed={wfComputed} client={client} stageCfg={stageCfg} onRefresh={onRefresh} />
       )}
 
       {/* TASKS TAB */}
       {tab==="tasks" && wf && (
-        <Card>
-          {(wf.tasks||[]).length===0
-            ? <div style={{ padding:"20px", textAlign:"center", color:C.muted, fontSize:13 }}>No task detail for this workflow yet</div>
-            : (wf.tasks||[]).map((task,i) => {
-              const tcfg = { complete:[C.greenBg,C.green], in_progress:[C.primaryBg,C.primary], pending:["#F1F5F9",C.muted], blocked:[C.redBg,C.red], missed:[C.redBg,C.red] };
-              const [tbg,tc] = tcfg[task.status]||tcfg.pending;
-              const taskUser = Object.values(USERS).find(u => u.initials===task.who);
-              return (
-                <div key={i} style={{ padding:"10px 16px", borderBottom:i<(wf.tasks.length-1)?`1px solid ${C.border}`:"none", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                  <div>
-                    <div style={{ fontSize:13, fontWeight:500, color:C.text }}>{task.title}</div>
-                    <div style={{ fontSize:11, color:C.muted, marginTop:2 }}>
-                      👤 {taskUser?.name||task.who}{task.due?` · 📅 Due ${task.due}`:""}
-                    </div>
-                  </div>
-                  <Pill label={task.status.replace("_"," ")} bg={tbg} color={tc} />
-                </div>
-              );
-            })
-          }
-        </Card>
+        <TasksTab wf={wf} onRefresh={onRefresh} />
       )}
 
       {/* DOCUMENTS TAB */}
       {tab==="documents" && wf && (
-        <div>
-          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}>
-            <div style={{ fontSize:13, fontWeight:600, color:C.text }}>Document Checklist — {wf.label}</div>
-            <Btn variant="primary">+ Send Request</Btn>
-          </div>
-          <div style={{ background:"#F0F9FF", border:"1px solid #BAE6FD", borderRadius:8, padding:"10px 14px", marginBottom:14, fontSize:12, color:"#0369A1" }}>
-            {client.type==="Corporation"
-              ? "🔒 Corporation checklist: bank statements, AR/AP aging, invoices, receipts >$500, ITC reconciliation"
-              : "🔒 Sole prop checklist: bank statements, all sales invoices, receipts >$100, GST registration (new clients)"}
-          </div>
-          <Card>
-            {(wf.docs||[]).length===0
-              ? <div style={{ padding:"20px", textAlign:"center", color:C.muted, fontSize:13 }}>No documents on record for this workflow</div>
-              : (wf.docs||[]).map((doc,i) => (
-                <div key={i} style={{ padding:"10px 16px", borderBottom:i<wf.docs.length-1?`1px solid ${C.border}`:"none", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                  <div>
-                    <div style={{ fontSize:13, color:C.text }}>{doc.name}</div>
-                    <div style={{ fontSize:11, color:C.muted, marginTop:1 }}>
-                      {doc.uploadedAt?`Uploaded ${doc.uploadedAt}${doc.by?" · "+doc.by:""}`:`Reminder #${doc.reminderCount} sent ${doc.lastReminderAt||"—"}`}
-                    </div>
-                  </div>
-                  <Pill label={doc.status==="received"?"Received":"Pending"} bg={doc.status==="received"?C.greenBg:C.amberBg} color={doc.status==="received"?C.green:C.amber} />
-                </div>
-              ))
-            }
-          </Card>
-          {client.emailLog?.length>0 && (
-            <div style={{ marginTop:14, background:C.amberBg, border:"1px solid #FCD34D", borderRadius:8, padding:"12px 16px" }}>
-              <div style={{ fontSize:12, fontWeight:600, color:C.amber, marginBottom:8 }}>Email Escalation Log</div>
-              {client.emailLog.map((e,i) => (
-                <div key={i} style={{ fontSize:12, color:"#92400E", marginBottom:4, display:"flex", gap:8 }}>
-                  <span style={{ color:C.green }}>✓</span>{e.type} — Sent {e.date}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        <DocumentsTab wf={wf} client={client} onRefresh={onRefresh} />
       )}
 
       {/* ACTIVITY TAB */}
       {tab==="activity" && (
-        <div>
-          <div style={{ fontSize:13, fontWeight:600, color:C.text, marginBottom:14 }}>Activity Feed</div>
-          {(client.activity||[]).length===0
-            ? <div style={{ padding:"20px", textAlign:"center", color:C.muted, fontSize:13 }}>No activity logged yet</div>
-            : (
-              <div style={{ position:"relative", paddingLeft:24 }}>
-                <div style={{ position:"absolute", left:8, top:0, bottom:0, width:2, background:C.border }} />
-                {(client.activity||[]).map((a,i) => (
-                  <div key={i} style={{ position:"relative", marginBottom:16 }}>
-                    <div style={{ position:"absolute", left:-20, top:2, width:10, height:10, borderRadius:"50%", background:a.who==="System"?C.border:C.primary, border:"2px solid white" }} />
-                    <div style={{ fontSize:12, fontWeight:600, color:C.text }}>{a.act}</div>
-                    <div style={{ fontSize:11, color:C.muted, marginTop:1 }}>{a.detail}</div>
-                    <div style={{ fontSize:11, color:C.slate, marginTop:2 }}>{a.who} · {a.t}</div>
-                  </div>
-                ))}
-              </div>
-            )
-          }
-        </div>
+        <ActivityTab clientId={client.id} />
       )}
 
       {/* INTEGRATION TAB */}
@@ -1513,8 +1682,10 @@ function SettingsPage() {
 export default function App() {
   const [view, setView]         = useState("dashboard");
   const [selected, setSelected] = useState(null);
-  const { clients, loading, error } = useClients();
+  const [refreshKey, setRefreshKey] = useState(0);
+  const { clients, loading, error } = useClients(refreshKey);
   const urgent = clients.filter(c => c.status==="At Risk"||c.status==="Overdue").length;
+  const onRefresh = () => setRefreshKey(k => k + 1);
 
   const nav = [
     { id:"dashboard",    label:"Command Centre", icon:"⊞" },
@@ -1603,7 +1774,7 @@ export default function App() {
       <div style={{ flex:1, padding:"28px 32px", overflowY:"auto", maxWidth:1000 }}>
         {view==="dashboard"    && <Dashboard clients={clients} onSelect={onSelect} setView={setView} />}
         {view==="clients"      && <ClientList clients={clients} onSelect={onSelect} />}
-        {view==="client"       && selected && <ClientWorkspace client={selected} onBack={() => { setSelected(null); setView("dashboard"); }} />}
+        {view==="client"       && selected && <ClientWorkspace client={selected} onBack={() => { setSelected(null); setView("dashboard"); }} onRefresh={onRefresh} />}
         {view==="allworkflows" && <AllWorkflows clients={clients} onSelectClient={onSelect} />}
         {view==="deadlines"    && <DeadlinesView clients={clients} onSelectClient={onSelect} />}
         {view==="templates"    && <WorkflowTemplates />}
