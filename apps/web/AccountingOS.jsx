@@ -1,7 +1,6 @@
 "use client"
-"use client";
+import { useState, useMemo, useEffect } from "react";
 
-import { useState, useMemo } from "react";
 
 // ─── DESIGN TOKENS ────────────────────────────────────────────────────────────
 const C = {
@@ -110,10 +109,11 @@ function wfRiskScore(wc, client) {
   return s;
 }
 
-function useClients() {
-  const [clients, setClients] = React.useState([])
 
-  React.useEffect(() => {
+function useClients() {
+  const [clients, setClients] = useState([])
+
+  useEffect(() => {
     fetch('/api/clients', { credentials: 'include' })
       .then(r => r.json())
       .then(json => { if (json.data) setClients(json.data) })
