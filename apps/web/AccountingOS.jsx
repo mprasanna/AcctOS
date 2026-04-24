@@ -1,4 +1,5 @@
-import { useState, useMemo } from "react";
+"use client"
+import { useState, useMemo, useEffect } from "react";
 
 // ─── DESIGN TOKENS ────────────────────────────────────────────────────────────
 const C = {
