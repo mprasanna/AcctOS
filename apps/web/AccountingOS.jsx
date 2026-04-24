@@ -380,6 +380,7 @@ function useClients() {
             daysToDeadline: c.days_to_deadline,
             score: c.risk_score,
             assigned: c.assigned_to,
+            assigned_user: c.assigned_user,               
             activeWf: c.active_workflow ? {
               ...c.active_workflow,
               stages: c.active_workflow.stages ?? [],
