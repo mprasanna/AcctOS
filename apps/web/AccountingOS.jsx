@@ -110,31 +110,18 @@ function wfRiskScore(wc, client) {
 }
 
 function useClients() {
-  return useMemo(() => {
-    return RAW_CLIENTS.map(client => {
-      // Compute per-workflow status
-      const computedWorkflows = client.workflows.map(wf => ({
-        ...wf,
-        computed: computeWorkflowStatus(wf, client),
-      }));
-      // Aggregate to client level
-      const worstWf   = computedWorkflows.reduce((w, c) =>
-        (c.computed.daysToDeadline ?? 999) < (w.computed.daysToDeadline ?? 999) &&
-        c.computed.status !== "Complete" ? c : w, computedWorkflows[0]);
-      const aggregate = aggregateClientStatus(computedWorkflows.map(w => w.computed));
-      const score     = wfRiskScore(aggregate, client);
-      return {
-        ...client,
-        workflows: computedWorkflows,
-        status:         aggregate.status,
-        flags:          aggregate.flags,
-        daysToDeadline: aggregate.daysToDeadline,
-        activeWf:       worstWf,
-        score,
-      };
-    }).sort((a, b) => b.score - a.score);
-  }, []);
+  const [clients, setClients] = React.useState([])
+
+  React.useEffect(() => {
+    fetch('/api/clients', { credentials: 'include' })
+      .then(r => r.json())
+      .then(json => { if (json.data) setClients(json.data) })
+      .catch(console.error)
+  }, [])
+
+  return clients
 }
+
 
 // ─── GATE ENFORCEMENT LOGIC ───────────────────────────────────────────────────
 // Determines whether a stage is hard-blocked and why.
