@@ -1,5 +1,5 @@
 "use client";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 
 // ─── DESIGN TOKENS ────────────────────────────────────────────────────────────
 const C = {
@@ -12,7 +12,7 @@ const C = {
   text: "#0F172A", muted: "#475569", slate: "#94A3B8",
 };
 
-const TODAY = new Date("2025-10-14");
+const TODAY = new Date();
 function daysFrom(a, b) { return Math.floor((new Date(b) - new Date(a)) / 86400000); }
 function fmtDate(d) { return new Date(d).toLocaleDateString("en-CA", { month: "short", day: "numeric" }); }
 function fmtLong(d) { return new Date(d).toLocaleDateString("en-CA", { month: "long", day: "numeric", year: "numeric" }); }
@@ -367,30 +367,75 @@ function wfRiskScore(wc, client) {
 }
 
 function useClients() {
-  return useMemo(() => {
-    return RAW_CLIENTS.map(client => {
-      // Compute per-workflow status
-      const computedWorkflows = client.workflows.map(wf => ({
-        ...wf,
-        computed: computeWorkflowStatus(wf, client),
-      }));
-      // Aggregate to client level
-      const worstWf   = computedWorkflows.reduce((w, c) =>
-        (c.computed.daysToDeadline ?? 999) < (w.computed.daysToDeadline ?? 999) &&
-        c.computed.status !== "Complete" ? c : w, computedWorkflows[0]);
-      const aggregate = aggregateClientStatus(computedWorkflows.map(w => w.computed));
-      const score     = wfRiskScore(aggregate, client);
-      return {
-        ...client,
-        workflows: computedWorkflows,
-        status:         aggregate.status,
-        flags:          aggregate.flags,
-        daysToDeadline: aggregate.daysToDeadline,
-        activeWf:       worstWf,
-        score,
-      };
-    }).sort((a, b) => b.score - a.score);
+  const [clients, setClients] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError]     = useState(null);
+
+  useEffect(() => {
+    fetch('/api/clients', { credentials: 'include' })
+      .then(r => {
+        if (!r.ok) throw new Error("API " + r.status);
+        return r.json();
+      })
+      .then(json => {
+        if (!json.data) throw new Error("No data in response");
+        const mapped = json.data.map(c => ({
+          ...c,
+          type:           c.client_type  ?? c.type,
+          freq:           c.filing_freq  ?? c.freq,
+          assigned:       c.assigned_to  ?? c.assigned,
+          assigned_user:  c.assigned_user,
+          status:         c.computed_status  ?? c.status  ?? "On Track",
+          flags:          c.computed_flags   ?? c.flags   ?? [],
+          daysToDeadline: c.days_to_deadline ?? c.daysToDeadline ?? null,
+          score:          c.risk_score       ?? c.score   ?? 0,
+          riskHistory:    c.risk_history     ?? c.riskHistory ?? false,
+          penaltyRisk:    c.penalty_risk     ?? c.penaltyRisk ?? null,
+          netGst:         c.net_gst          ?? c.netGst  ?? null,
+          activeWf: c.active_workflow ? {
+            ...c.active_workflow,
+            stages:     c.active_workflow.stages ?? [],
+            tasks:      c.active_workflow.tasks  ?? [],
+            docs:       c.active_workflow.docs   ?? [],
+            stageNotes: c.active_workflow.stage_notes ?? {},
+            curStage:   c.active_workflow.cur_stage ?? 1,
+            taskInProgressDays: c.active_workflow.task_in_progress_days ?? 0,
+            cycleStart: c.active_workflow.cycle_start ? new Date(c.active_workflow.cycle_start) : null,
+            deadline:   c.active_workflow.deadline    ? new Date(c.active_workflow.deadline)    : null,
+            computed: {
+              status: c.active_workflow.computed_status ?? "On Track",
+              flags:  c.active_workflow.computed_flags  ?? [],
+            },
+            daysToDeadline: c.active_workflow.days_to_deadline ?? null,
+          } : null,
+          workflows: (c.workflows ?? []).map(wf => ({
+            ...wf,
+            stages:     wf.stages ?? [],
+            tasks:      wf.tasks  ?? [],
+            docs:       wf.docs   ?? [],
+            stageNotes: wf.stage_notes ?? {},
+            curStage:   wf.cur_stage   ?? 1,
+            taskInProgressDays: wf.task_in_progress_days ?? 0,
+            cycleStart: wf.cycle_start ? new Date(wf.cycle_start) : null,
+            deadline:   wf.deadline    ? new Date(wf.deadline)    : null,
+            computed: {
+              status: wf.computed_status ?? "On Track",
+              flags:  wf.computed_flags  ?? [],
+            },
+            daysToDeadline: wf.days_to_deadline ?? null,
+          })),
+        }));
+        setClients(mapped);
+        setError(null);
+      })
+      .catch(err => {
+        console.error("useClients fetch failed:", err);
+        setError(err.message);
+      })
+      .finally(() => setLoading(false));
   }, []);
+
+  return { clients, loading, error };
 }
 
 // ─── GATE ENFORCEMENT LOGIC ───────────────────────────────────────────────────
@@ -765,7 +810,7 @@ function ClientList({ clients, onSelect }) {
               </div>
               <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:5 }}>
                 <StatusBadge status={cl.status} />
-                {wf && <div style={{ fontSize:12, color:C.muted }}>{cl.daysToDeadline<0?`${Math.abs(cl.daysToDeadline)}d overdue`:`${cl.daysToDeadline}d to deadline`}</div>}
+                {wf && <div style={{ fontSize:12, color:C.muted }}>{cl.daysToDeadline==null?"—":cl.daysToDeadline<0?`${Math.abs(cl.daysToDeadline)}d overdue`:`${cl.daysToDeadline}d to deadline`}</div>}
               </div>
               {u && <div style={{ display:"flex", alignItems:"center", gap:6 }}><Avatar name={u.name} size={24} /><span style={{ fontSize:12, color:C.muted }}>{u.initials}</span></div>}
               <span style={{ color:C.slate, fontSize:18 }}>›</span>
@@ -1466,10 +1511,10 @@ function SettingsPage() {
 
 // ─── APP SHELL ────────────────────────────────────────────────────────────────
 export default function App() {
-  const [view, setView]       = useState("dashboard");
+  const [view, setView]         = useState("dashboard");
   const [selected, setSelected] = useState(null);
-  const clients = useClients();
-  const urgent  = clients.filter(c => c.status==="At Risk"||c.status==="Overdue").length;
+  const { clients, loading, error } = useClients();
+  const urgent = clients.filter(c => c.status==="At Risk"||c.status==="Overdue").length;
 
   const nav = [
     { id:"dashboard",    label:"Command Centre", icon:"⊞" },
@@ -1483,6 +1528,30 @@ export default function App() {
   ];
 
   const onSelect = c => { setSelected(c); setView("client"); };
+
+  // ── Loading / error states ──────────────────────────────────────────────────
+  if (loading) return (
+    <div style={{ display:"flex", alignItems:"center", justifyContent:"center", height:"100vh", background:C.bg, flexDirection:"column", gap:12 }}>
+      <div style={{ width:32, height:32, borderRadius:"50%", border:`3px solid ${C.border}`, borderTopColor:C.primary, animation:"spin 0.8s linear infinite" }} />
+      <div style={{ fontSize:13, color:C.muted }}>Loading clients from database…</div>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+    </div>
+  );
+
+  if (error) return (
+    <div style={{ display:"flex", alignItems:"center", justifyContent:"center", height:"100vh", background:C.bg, flexDirection:"column", gap:12 }}>
+      <div style={{ background:C.redBg, border:`1px solid #FCA5A5`, borderRadius:12, padding:"24px 32px", maxWidth:400, textAlign:"center" }}>
+        <div style={{ fontSize:20, marginBottom:8 }}>⚠️</div>
+        <div style={{ fontSize:15, fontWeight:600, color:C.red, marginBottom:6 }}>Could not load clients</div>
+        <div style={{ fontSize:13, color:C.muted, marginBottom:16 }}>API error: {error}</div>
+        <div style={{ fontSize:12, color:C.slate }}>Check that you are logged in and the API is reachable.</div>
+        <button onClick={() => window.location.href='/login'}
+          style={{ marginTop:16, background:C.primary, color:"white", border:"none", borderRadius:8, padding:"8px 20px", fontSize:13, fontWeight:500, cursor:"pointer" }}>
+          Go to Login
+        </button>
+      </div>
+    </div>
+  );
 
   return (
     <div style={{ display:"flex", minHeight:"100vh", background:C.bg, fontFamily:"'Inter', system-ui, sans-serif" }}>
@@ -1517,10 +1586,17 @@ export default function App() {
         <div style={{ padding:"12px 14px", borderTop:`1px solid ${C.border}` }}>
           <div style={{ display:"flex", alignItems:"center", gap:8 }}>
             <Avatar name="Patrick W." size={26} />
-            <div>
+            <div style={{ flex:1 }}>
               <div style={{ fontSize:11, fontWeight:600, color:C.text }}>Patrick W.</div>
               <div style={{ fontSize:10, color:C.muted }}>Owner · Growth Plan</div>
             </div>
+            <button onClick={() => {
+              fetch('/api/auth/logout', { method:'POST', credentials:'include' })
+                .then(() => { window.location.href = '/login'; });
+            }} style={{ background:"none", border:"none", fontSize:10, color:C.muted, cursor:"pointer", padding:"2px 4px", borderRadius:4 }}
+              onMouseEnter={e => e.currentTarget.style.color=C.red}
+              onMouseLeave={e => e.currentTarget.style.color=C.muted}
+            >Sign out</button>
           </div>
         </div>
       </div>
