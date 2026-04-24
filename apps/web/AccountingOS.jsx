@@ -1,5 +1,4 @@
-"use client"
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 
 // ─── DESIGN TOKENS ────────────────────────────────────────────────────────────
 const C = {
@@ -367,47 +366,30 @@ function wfRiskScore(wc, client) {
 }
 
 function useClients() {
-  const [clients, setClients] = useState([])
-
-  useEffect(() => {
-    fetch('/api/clients', { credentials: 'include' })
-      .then(r => r.json())
-      .then(json => {
-        if (json.data) {
-          const mapped = json.data.map(c => ({
-            ...c,
-            // Map snake_case API fields to camelCase expected by the UI
-            daysToDeadline: c.days_to_deadline,
-            score: c.risk_score,
-            assigned: c.assigned_to,
-            assigned_user: c.assigned_user,               
-            activeWf: c.active_workflow ? {
-              ...c.active_workflow,
-              stages: c.active_workflow.stages ?? [],
-              curStage: c.active_workflow.cur_stage,       
-              computed: {
-                status: c.active_workflow.computed_status,
-                flags:  c.active_workflow.computed_flags ?? [],
-              },
-              daysToDeadline: c.active_workflow.days_to_deadline,
-            } : null,
-            workflows: (c.workflows ?? []).map(wf => ({
-              ...wf,
-              curStage: wf.cur_stage,                       
-              computed: {
-                status: wf.computed_status,
-                flags:  wf.computed_flags ?? [],
-              },
-              daysToDeadline: wf.days_to_deadline,
-            })),
-          }))
-          setClients(mapped)
-        }
-      })
-      .catch(console.error)
-  }, [])
-
-  return clients
+  return useMemo(() => {
+    return RAW_CLIENTS.map(client => {
+      // Compute per-workflow status
+      const computedWorkflows = client.workflows.map(wf => ({
+        ...wf,
+        computed: computeWorkflowStatus(wf, client),
+      }));
+      // Aggregate to client level
+      const worstWf   = computedWorkflows.reduce((w, c) =>
+        (c.computed.daysToDeadline ?? 999) < (w.computed.daysToDeadline ?? 999) &&
+        c.computed.status !== "Complete" ? c : w, computedWorkflows[0]);
+      const aggregate = aggregateClientStatus(computedWorkflows.map(w => w.computed));
+      const score     = wfRiskScore(aggregate, client);
+      return {
+        ...client,
+        workflows: computedWorkflows,
+        status:         aggregate.status,
+        flags:          aggregate.flags,
+        daysToDeadline: aggregate.daysToDeadline,
+        activeWf:       worstWf,
+        score,
+      };
+    }).sort((a, b) => b.score - a.score);
+  }, []);
 }
 
 // ─── GATE ENFORCEMENT LOGIC ───────────────────────────────────────────────────
@@ -569,6 +551,20 @@ function GateBanner({ gate }) {
   );
 }
 
+// ─── STAGE ACTOR HELPER ───────────────────────────────────────────────────────
+function getStageActor(stageN, client) {
+  const isDualReview = client.netGst > 10000;
+  const actors = {
+    1: { action: "Confirm bookkeeping is complete in QBO",                          role: "Accountant", who: "KS / JR" },
+    2: { action: "Mark all required documents as received",                         role: "Admin",      who: "RH" },
+    3: { action: client.type==="Corporation" ? "Complete draft return — ITC reconciliation required first" : "Complete draft return — simplified checklist", role: "Accountant", who: "KS / JR" },
+    4: { action: isDualReview ? "Dual approval required — accountant + senior CPA both must sign off" : "Review draft return and approve", role: isDualReview ? "Accountant + Owner" : "Senior CPA", who: isDualReview ? "KS + PW" : "PW" },
+    5: { action: "Submit return to CRA",                                             role: "Accountant", who: "KS / JR" },
+    6: { action: "Record CRA confirmation number to close workflow",                 role: "Accountant", who: "KS / JR" },
+  };
+  return actors[stageN] || { action: "Advance stage", role: "Accountant", who: "KS / JR" };
+}
+
 // ─── DASHBOARD ────────────────────────────────────────────────────────────────
 function Dashboard({ clients, onSelect, setView }) {
   const cnt = {
@@ -656,7 +652,7 @@ function Dashboard({ clients, onSelect, setView }) {
           <tbody>
             {clients.map((cl,i) => {
               const wf = cl.activeWf;
-              const u = cl.assigned_user;
+              const u  = USERS[cl.assigned];
               return (
                 <tr key={cl.id} onClick={() => onSelect(cl)}
                   style={{ background:i%2===0?"white":"#FAFAFA", cursor:"pointer" }}
@@ -720,6 +716,14 @@ function ClientList({ clients, onSelect }) {
   const [q, setQ] = useState("");
   const [f, setF] = useState("All");
   const filtered = clients.filter(c => c.name.toLowerCase().includes(q.toLowerCase()) && (f==="All"||c.status===f));
+  const counts = {
+    All: clients.length,
+    "On Track": clients.filter(c => c.status==="On Track").length,
+    "At Risk":  clients.filter(c => c.status==="At Risk").length,
+    "Overdue":  clients.filter(c => c.status==="Overdue").length,
+    "Complete": clients.filter(c => c.status==="Complete").length,
+  };
+  const filterColors = { "At Risk": C.amber, "Overdue": C.red, "On Track": C.green, "Complete": C.green, "All": C.primary };
   return (
     <div>
       <SectionHead title="All Clients" sub={`${clients.length} clients on file`} />
@@ -727,9 +731,19 @@ function ClientList({ clients, onSelect }) {
         <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search clients…"
           style={{ flex:1, padding:"8px 14px", borderRadius:8, border:`1px solid ${C.border}`, fontSize:14, outline:"none" }} />
         <div style={{ display:"flex", gap:4 }}>
-          {["All","On Track","At Risk","Overdue","Complete"].map(s => (
-            <Btn key={s} onClick={() => setF(s)} variant={f===s?"primary":"outline"}>{s}</Btn>
-          ))}
+          {["All","On Track","At Risk","Overdue","Complete"].map(s => {
+            const active = f===s;
+            const badgeColor = filterColors[s];
+            return (
+              <button key={s} onClick={() => setF(s)}
+                style={{ display:"flex", alignItems:"center", gap:5, padding:"7px 12px", borderRadius:8, border:`1px solid ${active?C.primary:C.border}`, background:active?C.primary:"white", color:active?"white":C.text, fontSize:13, fontWeight:500, cursor:"pointer" }}>
+                {s}
+                <span style={{ background:active?"rgba(255,255,255,0.25)":(s==="At Risk"?C.amberBg:s==="Overdue"?C.redBg:s==="Complete"||s==="On Track"?C.greenBg:C.primaryBg), color:active?"white":badgeColor, fontSize:11, fontWeight:700, padding:"1px 6px", borderRadius:10, minWidth:18, textAlign:"center" }}>
+                  {counts[s]}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </div>
       <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
@@ -758,6 +772,112 @@ function ClientList({ clients, onSelect }) {
           );
         })}
       </div>
+    </div>
+  );
+}
+
+// ─── WORKFLOW TAB (with live stage advancement) ───────────────────────────────
+function WorkflowTab({ wf, wfComputed, client, stageCfg }) {
+  const [stageData, setStageData] = useState(() => wf.stages.map(s => ({...s})));
+  const [confirmInput, setConfirmInput] = useState("");
+  const [advanced, setAdvanced] = useState(null); // last advanced stage n
+
+  // Reset when workflow changes
+  const wfId = wf.id;
+  const [lastWfId, setLastWfId] = useState(wfId);
+  if (wfId !== lastWfId) { setStageData(wf.stages.map(s => ({...s}))); setLastWfId(wfId); setAdvanced(null); }
+
+  function advanceStage(stageN) {
+    setStageData(prev => prev.map(s => {
+      if (s.n === stageN)     return {...s, status:"complete",    date:`Oct ${14 + stageN}`};
+      if (s.n === stageN + 1) return {...s, status:"in_progress", date:`Oct ${14 + stageN}`};
+      return s;
+    }));
+    setAdvanced(stageN);
+    setConfirmInput("");
+  }
+
+  if ((stageData||[]).length === 0)
+    return <div style={{ background:"#F8FAFC", borderRadius:8, padding:"20px", textAlign:"center", color:C.muted, fontSize:12 }}>Stage detail not available for this workflow type yet</div>;
+
+  return (
+    <div>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14 }}>
+        <div style={{ fontSize:13, fontWeight:600, color:C.text }}>{wf.label} — Stage Timeline</div>
+        {wfComputed.status && <StatusBadge status={wfComputed.status} small />}
+      </div>
+
+      {advanced !== null && (
+        <div style={{ background:C.greenBg, border:"1px solid #BBF7D0", borderRadius:8, padding:"9px 14px", marginBottom:14, display:"flex", alignItems:"center", gap:8 }}>
+          <span style={{ fontSize:13 }}>✓</span>
+          <span style={{ fontSize:13, color:"#14532D", fontWeight:500 }}>Stage {advanced} completed — Stage {advanced + 1} is now active</span>
+          <span style={{ fontSize:12, color:"#16A34A", marginLeft:"auto" }}>Activity logged</span>
+        </div>
+      )}
+
+      {stageData.map((s, i) => {
+        const cfg  = stageCfg[s.status] || stageCfg.pending;
+        const gate = evaluateGate(s, {...wf, stages: stageData}, client);
+        const isActive = s.status === "in_progress";
+        const actor = getStageActor(s.n, client);
+        const isLastStage = s.n === 6;
+
+        return (
+          <div key={i} style={{ display:"flex" }}>
+            <div style={{ display:"flex", flexDirection:"column", alignItems:"center", marginRight:14, width:24 }}>
+              <div style={{ width:24, height:24, borderRadius:"50%", background:cfg.bg, border:`2px solid ${cfg.color}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:10, color:cfg.color, fontWeight:700, flexShrink:0, transition:"all 0.2s" }}>
+                {s.status==="complete"?"✓":s.status==="missed"?"✕":s.status==="blocked"?"🔒":i+1}
+              </div>
+              {i < stageData.length - 1 && <div style={{ width:2, flex:1, minHeight:14, background:s.status==="complete"?C.green:C.border, margin:"2px 0", transition:"background 0.3s" }} />}
+            </div>
+
+            <div style={{ flex:1, paddingBottom:16, paddingTop:2 }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+                <span style={{ fontSize:13, fontWeight:500, color:C.text }}>Stage {i+1}: {s.name}</span>
+                <Pill label={cfg.label} bg={cfg.bg} color={cfg.color} />
+              </div>
+              {s.date && <div style={{ fontSize:11, color:C.muted, marginTop:2 }}>{s.date}</div>}
+              {wf.stageNotes?.[i+1] && <div style={{ fontSize:11, color:C.primary, marginTop:2 }}>↳ {wf.stageNotes[i+1]}</div>}
+              {s.gateLabel && <div style={{ fontSize:11, color:C.slate, marginTop:3 }}>🔒 {s.gateLabel}</div>}
+              <GateBanner gate={gate} />
+
+              {/* ── ACTION FOOTER — only on the active, unblocked stage ── */}
+              {isActive && !gate?.locked && !isLastStage && (
+                <div style={{ marginTop:10, background:"#F0FDF4", border:"1px solid #BBF7D0", borderRadius:8, padding:"10px 14px" }}>
+                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                    <div>
+                      <div style={{ fontSize:12, fontWeight:600, color:"#14532D", marginBottom:2 }}>{actor.action}</div>
+                      <div style={{ fontSize:11, color:"#16A34A" }}>👤 {actor.role} · {actor.who}</div>
+                    </div>
+                    <button onClick={() => advanceStage(s.n)}
+                      style={{ background:C.green, color:"white", border:"none", borderRadius:8, padding:"8px 16px", fontSize:13, fontWeight:600, cursor:"pointer", whiteSpace:"nowrap" }}>
+                      Complete Stage {s.n} →
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Stage 6 — confirmation number input */}
+              {isActive && s.n === 6 && !gate?.locked && (
+                <div style={{ marginTop:10, background:"#F0FDF4", border:"1px solid #BBF7D0", borderRadius:8, padding:"10px 14px" }}>
+                  <div style={{ fontSize:12, fontWeight:600, color:"#14532D", marginBottom:8 }}>Record CRA confirmation number to close workflow</div>
+                  <div style={{ display:"flex", gap:8 }}>
+                    <input value={confirmInput} onChange={e => setConfirmInput(e.target.value)}
+                      placeholder="e.g. RT2025-48291"
+                      style={{ flex:1, padding:"7px 12px", borderRadius:8, border:`1px solid ${C.border}`, fontSize:13, outline:"none" }} />
+                    <button onClick={() => confirmInput.trim() && advanceStage(6)}
+                      disabled={!confirmInput.trim()}
+                      style={{ background:confirmInput.trim()?C.green:"#D1FAE5", color:confirmInput.trim()?"white":"#6EE7B7", border:"none", borderRadius:8, padding:"7px 16px", fontSize:13, fontWeight:600, cursor:confirmInput.trim()?"pointer":"not-allowed" }}>
+                      Close Workflow ✓
+                    </button>
+                  </div>
+                  <div style={{ fontSize:11, color:"#16A34A", marginTop:6 }}>👤 Accountant · {USERS[client.assigned]?.initials}</div>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -848,42 +968,9 @@ function ClientWorkspace({ client, onBack }) {
         ))}
       </div>
 
-      {/* WORKFLOW TAB — with gate enforcement */}
+      {/* WORKFLOW TAB — with gate enforcement + stage advancement */}
       {tab==="workflow" && wf && (
-        <div>
-          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14 }}>
-            <div style={{ fontSize:13, fontWeight:600, color:C.text }}>{wf.label} — Stage Timeline</div>
-            {wfComputed.status && <StatusBadge status={wfComputed.status} small />}
-          </div>
-          {(wf.stages||[]).length===0
-            ? <div style={{ background:"#F8FAFC", borderRadius:8, padding:"20px", textAlign:"center", color:C.muted, fontSize:12 }}>Stage detail not available for this workflow type yet</div>
-            : (wf.stages||[]).map((s,i) => {
-              const cfg  = stageCfg[s.status]||stageCfg.pending;
-              const gate = evaluateGate(s, wf, client);
-              return (
-                <div key={i} style={{ display:"flex" }}>
-                  <div style={{ display:"flex", flexDirection:"column", alignItems:"center", marginRight:14, width:24 }}>
-                    <div style={{ width:24, height:24, borderRadius:"50%", background:cfg.bg, border:`2px solid ${cfg.color}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:10, color:cfg.color, fontWeight:700, flexShrink:0 }}>
-                      {s.status==="complete"?"✓":s.status==="missed"?"✕":s.status==="blocked"?"🔒":i+1}
-                    </div>
-                    {i<(wf.stages.length-1) && <div style={{ width:2, flex:1, minHeight:14, background:C.border, margin:"2px 0" }} />}
-                  </div>
-                  <div style={{ flex:1, paddingBottom:16, paddingTop:2 }}>
-                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
-                      <span style={{ fontSize:13, fontWeight:500, color:C.text }}>Stage {i+1}: {s.name}</span>
-                      <Pill label={cfg.label} bg={cfg.bg} color={cfg.color} />
-                    </div>
-                    {s.date && <div style={{ fontSize:11, color:C.muted, marginTop:2 }}>{s.date}</div>}
-                    {wf.stageNotes?.[i+1] && <div style={{ fontSize:11, color:C.primary, marginTop:2 }}>↳ {wf.stageNotes[i+1]}</div>}
-                    {s.gateLabel && <div style={{ fontSize:11, color:C.slate, marginTop:3 }}>🔒 {s.gateLabel}</div>}
-                    {/* GATE BANNER — hard stop / info / warn */}
-                    <GateBanner gate={gate} />
-                  </div>
-                </div>
-              );
-            })
-          }
-        </div>
+        <WorkflowTab wf={wf} wfComputed={wfComputed} client={client} stageCfg={stageCfg} />
       )}
 
       {/* TASKS TAB */}
@@ -1107,62 +1194,80 @@ function DeadlinesView({ clients, onSelectClient }) {
 
 // ─── WORKFLOW TEMPLATES ───────────────────────────────────────────────────────
 function WorkflowTemplates() {
-  const [open, setOpen] = useState("gst");
-  const wfs = [
-    { id:"gst", name:"GST/HST Filing", phase:"Phase 1 — Live", pc:C.green, freq:"Monthly / Quarterly / Annual",
-      desc:"CRA-aware 6-stage workflow with 5-condition At Risk engine, per-workflow status computation, client-type branching, document escalation, and dual-review gate enforcement.",
-      stages:[
-        { name:"Data Ready",          task:"Confirm bookkeeping complete in QBO",              gate:"Hard block — Stage 2 cannot start if bookkeeping incomplete" },
-        { name:"Document Collection", task:"Request invoices/receipts per client-type checklist", gate:"Hard block — Stage 3 cannot start until all docs received; auto-reminders Day 3 & 6; escalate on Reminder #2" },
-        { name:"Preparation",         task:"Calculate GST + prepare draft return",              gate:"Branch: Corporation → ITC reconciliation + validation; Sole prop → simplified checklist; high-risk → senior auto-assigned" },
-        { name:"Review",              task:"Senior review and sign-off",                        gate:"GST > $10k → dual review gate; refund → justification doc required" },
-        { name:"Filing",              task:"Submit return to CRA",                              gate:"Hard block — Filing disabled until Stage 4 review is approved" },
-        { name:"Confirmation",        task:"Record CRA confirmation number",                    gate:"Auto-notify firm owner on completion; mark workflow Complete" },
-      ]},
-    { id:"t1",     name:"Personal Tax Return (T1)",        phase:"Phase 2 — Upcoming", pc:C.amber, freq:"Annual (Jan–Apr peak)",         desc:"Highest client volume, heaviest document chase. T4/T5 tracking, seasonal surge management.", stages:[] },
-    { id:"t2",     name:"Corporate Tax (T2)",              phase:"Phase 2 — Upcoming", pc:C.amber, freq:"Annual (year-end based)",        desc:"Multi-step corporate returns, high-value client management, complex year-end coordination.", stages:[] },
-    { id:"bk",     name:"Monthly Bookkeeping",             phase:"Phase 2 — Upcoming", pc:C.amber, freq:"Monthly",                       desc:"Reconciliation and review cycle — feeds directly into GST workflow.", stages:[] },
-    { id:"payroll",name:"Payroll Remittances",             phase:"Phase 3 — Roadmap",  pc:C.slate, freq:"Monthly / Bi-weekly",           desc:"CRA payroll deadlines, penalty-sensitive remittance tracking.", stages:[] },
-    { id:"reports",name:"Financial Statements / Reports",  phase:"Phase 3 — Roadmap",  pc:C.slate, freq:"Monthly / Quarterly",           desc:"Client-facing deliverables, review cycle management.", stages:[] },
-    { id:"onboard",name:"New Client Onboarding",           phase:"Phase 3 — Roadmap",  pc:C.slate, freq:"Event-based",                   desc:"Collect info, set up QBO, assign workflows, define document checklist.", stages:[] },
-    { id:"yearend",name:"Year-End Closing",                phase:"Phase 3 — Roadmap",  pc:C.slate, freq:"Annual",                        desc:"Adjust entries, finalise books.", stages:[] },
-    { id:"audit",  name:"CRA Notices / Audit Response",   phase:"Phase 3 — Roadmap",  pc:C.slate, freq:"Event-based",                   desc:"Document collection, deadline response, CRA correspondence tracking.", stages:[] },
+  const gstStages = [
+    { name:"Data Ready",          who:"Accountant (KS/JR)",  task:"Confirm bookkeeping complete in QBO",                gate:"blocked",  gateText:"Hard block — Stage 2 cannot start until bookkeeping is confirmed" },
+    { name:"Document Collection", who:"Admin (RH)",           task:"Request documents per client-type checklist",        gate:"blocked",  gateText:"Hard block — Stage 3 locked until all docs received; auto-reminders Day 3 & 6; escalate on Reminder #2" },
+    { name:"Preparation",         who:"Accountant (KS/JR)",  task:"Calculate GST + prepare draft return",               gate:"info",     gateText:"Branch: Corporation → ITC reconciliation required; Sole prop → simplified checklist; high-risk client → senior auto-assigned" },
+    { name:"Review",              who:"Senior CPA (PW)",      task:"Review draft return and approve",                    gate:"info",     gateText:"GST > $10,000 → dual review gate (both accountant + senior must approve); refund claim → justification doc required" },
+    { name:"Filing",              who:"Accountant (KS/JR)",  task:"Submit return to CRA",                               gate:"blocked",  gateText:"Hard block — filing is disabled until Stage 4 review is fully approved" },
+    { name:"Confirmation",        who:"Accountant (KS/JR)",  task:"Record CRA confirmation number → workflow closes",   gate:"complete", gateText:"Auto-notifies firm owner on completion; workflow marked Complete" },
+  ];
+  const gateStyle = {
+    blocked:  { bg:"#FFF1F2", border:"#FECDD3", color:C.red,     icon:"🔒" },
+    info:     { bg:"#EFF6FF", border:"#BFDBFE", color:C.primary, icon:"⑂"  },
+    complete: { bg:C.greenBg, border:"#BBF7D0", color:C.green,   icon:"✓"  },
+  };
+  const upcoming = [
+    { name:"Personal Tax Return (T1)", phase:"Phase 2", note:"Highest volume. T4/T5 tracking, seasonal surge Jan–Apr." },
+    { name:"Corporate Tax (T2)",        phase:"Phase 2", note:"Year-end based. High-value clients, complex coordination." },
+    { name:"Monthly Bookkeeping",       phase:"Phase 2", note:"Feeds Stage 1 of GST workflow automatically." },
+    { name:"Payroll Remittances",       phase:"Phase 3", note:"CRA payroll deadlines. Penalty-sensitive." },
   ];
   return (
     <div>
-      <SectionHead title="Workflow Templates" sub="One engine — configurable templates. T1 in Phase 2 = a new template, not a new system." />
-      <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-        {wfs.map(wf => (
-          <Card key={wf.id} style={{ overflow:"hidden" }}>
-            <div onClick={() => setOpen(open===wf.id?null:wf.id)} style={{ padding:"13px 18px", cursor:"pointer", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-              <div>
-                <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                  <span style={{ fontSize:14, fontWeight:600, color:C.text }}>{wf.name}</span>
-                  <Pill label={wf.phase} bg={wf.pc+"22"} color={wf.pc} />
-                </div>
-                <div style={{ fontSize:12, color:C.muted, marginTop:2 }}>{wf.freq}</div>
+      <SectionHead title="Workflow Templates" sub="One engine, configurable templates — adding T1 in Phase 2 means a new template file, not a new system" />
+
+      {/* Live template — GST/HST */}
+      <div style={{ marginBottom:10, display:"flex", alignItems:"center", gap:8 }}>
+        <span style={{ fontSize:13, fontWeight:700, color:C.text }}>GST/HST Filing</span>
+        <Pill label="Phase 1 — Live" bg={C.greenBg} color={C.green} />
+        <span style={{ fontSize:12, color:C.muted }}>Monthly / Quarterly / Annual</span>
+      </div>
+      <div style={{ display:"flex", flexDirection:"column", gap:6, marginBottom:28 }}>
+        {gstStages.map((s, i) => {
+          const gs = gateStyle[s.gate];
+          return (
+            <div key={i} style={{ display:"flex", gap:0, alignItems:"stretch" }}>
+              {/* Stage number + connector */}
+              <div style={{ display:"flex", flexDirection:"column", alignItems:"center", width:32, flexShrink:0 }}>
+                <div style={{ width:26, height:26, borderRadius:"50%", background:C.primaryBg, color:C.primary, fontSize:11, fontWeight:700, display:"flex", alignItems:"center", justifyContent:"center", border:`2px solid ${C.primary}`, flexShrink:0 }}>{i+1}</div>
+                {i < gstStages.length-1 && <div style={{ width:2, flex:1, minHeight:10, background:C.border, margin:"3px 0" }} />}
               </div>
-              <span style={{ color:C.slate }}>{open===wf.id?"∧":"∨"}</span>
-            </div>
-            {open===wf.id && (
-              <div style={{ padding:"0 18px 18px", borderTop:`1px solid ${C.border}` }}>
-                <p style={{ fontSize:12, color:C.muted, margin:"12px 0 14px" }}>{wf.desc}</p>
-                {wf.stages.length>0?wf.stages.map((s,i) => (
-                  <div key={i} style={{ background:"#F8FAFC", borderRadius:8, padding:"9px 13px", marginBottom:6, display:"flex", gap:10, alignItems:"flex-start" }}>
-                    <div style={{ width:20, height:20, borderRadius:"50%", background:C.primaryBg, color:C.primary, fontSize:10, fontWeight:700, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>{i+1}</div>
-                    <div style={{ flex:1 }}>
-                      <div style={{ fontSize:12, fontWeight:600, color:C.text }}>{s.name}</div>
-                      <div style={{ fontSize:11, color:C.muted }}>{s.task}</div>
-                    </div>
-                    <div style={{ fontSize:11, color:C.indigo, background:C.indigoBg, padding:"2px 8px", borderRadius:6, flexShrink:0, maxWidth:240, textAlign:"right" }}>🔒 {s.gate}</div>
+              {/* Stage content */}
+              <div style={{ flex:1, background:"white", border:`1px solid ${C.border}`, borderRadius:8, padding:"10px 14px", marginLeft:8, marginBottom:2 }}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:4 }}>
+                  <div>
+                    <span style={{ fontSize:13, fontWeight:600, color:C.text }}>{s.name}</span>
+                    <span style={{ fontSize:11, color:C.muted, marginLeft:8 }}>· {s.task}</span>
                   </div>
-                )):(
-                  <div style={{ background:"#F8FAFC", borderRadius:8, padding:"18px", textAlign:"center", color:C.muted, fontSize:12 }}>Template available in {wf.phase.split(" — ")[0]}</div>
-                )}
+                  <span style={{ fontSize:11, color:C.muted, background:"#F1F5F9", padding:"2px 8px", borderRadius:6, whiteSpace:"nowrap", marginLeft:8 }}>👤 {s.who}</span>
+                </div>
+                <div style={{ background:gs.bg, border:`1px solid ${gs.border}`, borderRadius:6, padding:"5px 10px", display:"flex", gap:6, alignItems:"flex-start" }}>
+                  <span style={{ fontSize:11, flexShrink:0 }}>{gs.icon}</span>
+                  <span style={{ fontSize:11, color:gs.color }}>{s.gateText}</span>
+                </div>
               </div>
-            )}
-          </Card>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Upcoming templates */}
+      <div style={{ fontSize:12, fontWeight:600, color:C.muted, textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:10 }}>Coming Next</div>
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
+        {upcoming.map((t, i) => (
+          <div key={i} style={{ background:"white", border:`1px solid ${C.border}`, borderRadius:8, padding:"12px 14px" }}>
+            <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:4 }}>
+              <span style={{ fontSize:13, fontWeight:600, color:C.text }}>{t.name}</span>
+              <Pill label={t.phase} bg={t.phase==="Phase 2"?C.amberBg:"#F1F5F9"} color={t.phase==="Phase 2"?C.amber:C.muted} />
+            </div>
+            <div style={{ fontSize:12, color:C.muted }}>{t.note}</div>
+          </div>
         ))}
+      </div>
+
+      <div style={{ marginTop:16, background:"#F0F9FF", border:"1px solid #BAE6FD", borderRadius:8, padding:"10px 14px", fontSize:12, color:"#0369A1" }}>
+        Every template uses the same At Risk engine (C1–C5), the same gate enforcement, and the same stage structure. Templates configure the rules — the engine runs identically.
       </div>
     </div>
   );
@@ -1411,22 +1516,10 @@ export default function App() {
         <div style={{ padding:"12px 14px", borderTop:`1px solid ${C.border}` }}>
           <div style={{ display:"flex", alignItems:"center", gap:8 }}>
             <Avatar name="Patrick W." size={26} />
-            <div style={{ flex:1, minWidth:0 }}>
+            <div>
               <div style={{ fontSize:11, fontWeight:600, color:C.text }}>Patrick W.</div>
               <div style={{ fontSize:10, color:C.muted }}>Owner · Growth Plan</div>
             </div>
-            <button
-              title="Sign out"
-              onClick={async () => {
-                await fetch("/api/auth/logout", { method:"POST", credentials:"include" });
-                window.location.href = "/login";
-              }}
-              style={{ background:"none", border:"none", cursor:"pointer", padding:"4px 6px", borderRadius:6, color:C.slate, fontSize:14, flexShrink:0, lineHeight:1 }}
-              onMouseEnter={e => { e.currentTarget.style.background="#F1F5F9"; e.currentTarget.style.color=C.red; }}
-              onMouseLeave={e => { e.currentTarget.style.background="none"; e.currentTarget.style.color=C.slate; }}
-            >
-              ⏻
-            </button>
           </div>
         </div>
       </div>
