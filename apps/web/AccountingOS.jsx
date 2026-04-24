@@ -383,6 +383,7 @@ function useClients() {
             activeWf: c.active_workflow ? {
               ...c.active_workflow,
               stages: c.active_workflow.stages ?? [],
+              curStage: c.active_workflow.cur_stage,       
               computed: {
                 status: c.active_workflow.computed_status,
                 flags:  c.active_workflow.computed_flags ?? [],
@@ -391,6 +392,7 @@ function useClients() {
             } : null,
             workflows: (c.workflows ?? []).map(wf => ({
               ...wf,
+              curStage: wf.cur_stage,                       
               computed: {
                 status: wf.computed_status,
                 flags:  wf.computed_flags ?? [],
@@ -653,7 +655,7 @@ function Dashboard({ clients, onSelect, setView }) {
           <tbody>
             {clients.map((cl,i) => {
               const wf = cl.activeWf;
-              const u  = USERS[cl.assigned];
+              const u = cl.assigned_user;
               return (
                 <tr key={cl.id} onClick={() => onSelect(cl)}
                   style={{ background:i%2===0?"white":"#FAFAFA", cursor:"pointer" }}
