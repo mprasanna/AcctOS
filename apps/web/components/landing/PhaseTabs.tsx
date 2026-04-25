@@ -1,411 +1,176 @@
 "use client";
-
 import { useState } from "react";
 
 const PHASES = [
   {
-    tab: "Phase 1 — MVP",
-    badge: "✓ Live · Supabase + Next.js",
+    tab: "Phase 1",
+    label: "Backend + DB",
+    badge: "✓ Live",
     title: "Real backend. Real data. Real risk engine.",
-    desc:
-      "Phase 1 replaces the demo prototype with a production Supabase database. The 5-condition risk algorithm runs server-side. Every stage transition is gate-validated. Clients are real, workflows are persistent, and the CRA deadline clock never stops.",
+    desc: "Replaced the static prototype with a production Supabase PostgreSQL database. The 5-condition At Risk algorithm runs server-side on every request. Every stage transition is gate-validated before writing to the DB.",
     features: [
-      {
-        strong: "Supabase PostgreSQL backend",
-        text: " — 14 migration files, full schema for firms, clients, workflows, stages, tasks, documents and events",
-      },
-      {
-        strong: "5-condition At Risk engine",
-        text: " — C1 timeline breach, C2 deadline proximity, C3 document blocker, C4 stage stall, C5 risk history — per workflow, not per client",
-      },
-      {
-        strong: "Gate-enforced stage transitions",
-        text: " — Stage 3 hard-blocked until all docs received. Filing blocked until review approved. Hard stops with specific reasons.",
-      },
-      {
-        strong: "REST API",
-        text: " — complete endpoints for clients, workflows, stages, tasks, documents, dashboard and settings",
-      },
-      {
-        strong: "CRA deadlines native",
-        text: " — monthly, quarterly, annual filers. Ontario timezone. No manual configuration.",
-      },
+      "Supabase PostgreSQL — full schema across firms, clients, workflows, stages, tasks, documents, events",
+      "5-condition At Risk engine — C1 timeline breach, C2 deadline proximity, C3 document blocker, C4 stage stall, C5 risk history — evaluated per workflow",
+      "Gate-enforced stage transitions — Stage 3 hard-blocked until all docs received, filing blocked until review approved",
+      "42 REST API routes — clients, workflows, stages, tasks, documents, dashboard, settings, auth",
+      "Row Level Security — firm data isolated at the Postgres level, not application code",
     ],
-    url: "app.acctos.com/dashboard",
-    screen: "dashboard",
+    screen: (
+      <div style={{fontFamily:"'DM Mono',monospace",fontSize:11,background:"#0F1117",borderRadius:10,padding:"16px",color:"#94A3B8",lineHeight:1.7}}>
+        <div style={{display:"flex",gap:8,marginBottom:12}}>
+          {["#FF5F56","#FFBD2E","#27C93F"].map((c,i)=><div key={i} style={{width:10,height:10,borderRadius:"50%",background:c}}/>)}
+        </div>
+        <div><span style={{color:"#64748B"}}>GET </span><span style={{color:"#38BDF8"}}>/api/dashboard</span></div>
+        <div style={{color:"#64748B",marginLeft:8}}>→ <span style={{color:"#4ADE80"}}>200 OK</span></div>
+        <div style={{color:"#64748B",marginLeft:8,fontSize:10}}>{"{ active_filings: 9, at_risk: 3, overdue: 2 }"}</div>
+        <div style={{marginTop:8}}><span style={{color:"#64748B"}}>PATCH </span><span style={{color:"#38BDF8"}}>/api/stages/uuid</span></div>
+        <div style={{color:"#64748B",marginLeft:8}}>→ <span style={{color:"#F87171"}}>409 GATE_BLOCKED</span></div>
+        <div style={{color:"#64748B",marginLeft:8,fontSize:10}}>{"{ gate_reason: \"2 docs pending\" }"}</div>
+        <div style={{marginTop:8}}><span style={{color:"#64748B"}}>RLS </span><span style={{color:"#A78BFA"}}>firm_isolation_select</span></div>
+        <div style={{color:"#64748B",marginLeft:8,fontSize:10}}>firm_id = auth.jwt() -&gt;&gt; 'firm_id'</div>
+      </div>
+    ),
   },
   {
-    tab: "Phase 2 — Multi-user",
-    badge: "✓ Live · Supabase Auth + RLS",
-    title: "Multi-user roles. File uploads. T1 & T2 templates.",
-    desc:
-      "Phase 2 turns AcctOS into a real team tool. Supabase Auth with Row Level Security isolates every firm's data at the database level. Four user roles with distinct permissions. Stage auto-advance when tasks complete.",
+    tab: "Phase 2",
+    label: "Workflow Engine",
+    badge: "✓ Live",
+    title: "Templates, roles, and gate enforcement in the UI.",
+    desc: "Five workflow templates applied automatically on client creation. Four role types with server-side permission checks. Stage auto-advance when all tasks complete. Document checklist enforced per entity type.",
     features: [
-      {
-        strong: "4 user roles",
-        text: " — Owner (full access + escalations), Senior Accountant (dual review approval), Accountant (assigned clients), Admin (documents + comms)",
-      },
-      {
-        strong: "Row Level Security",
-        text: " — every query scoped to firm_id at the Postgres level. A bug in application code cannot leak data between firms.",
-      },
-      {
-        strong: "Auto-advance stages",
-        text: " — when all tasks in a stage are complete and the gate condition passes, the workflow advances automatically",
-      },
-      {
-        strong: "File uploads",
-        text: " — clients upload directly to Supabase Storage. Document checklist auto-updates. Stage 2 gate unlocks on receipt.",
-      },
-      {
-        strong: "T1, T2 & Bookkeeping templates",
-        text: " — same engine, new configurations. T1 for personal returns, T2 for corporate, monthly bookkeeping cycle.",
-      },
+      "5 templates — GST/HST, T1 Personal, T2 Corporate, Payroll Remittances, Monthly Bookkeeping",
+      "Client type branching — Corporation gets ITC reconciliation; sole prop gets simplified checklist",
+      "4 user roles — Owner, Senior CPA, Accountant, Admin — enforced at API level not just UI",
+      "Dual review gate — GST > $10,000 requires both accountant and senior CPA to approve Stage 4",
+      "T183 gate — T1 Stage 5 hard-blocked until authorization form is uploaded",
     ],
-    url: "app.acctos.com/clients/sunrise-bakery",
-    screen: "workflow",
+    screen: (
+      <div style={{background:"#0F1117",borderRadius:10,padding:"14px",fontSize:11,fontFamily:"system-ui"}}>
+        <div style={{color:"#94A3B8",marginBottom:10,fontWeight:600}}>Sunrise Bakery — GST/HST Q3</div>
+        {[
+          {n:1,name:"Bookkeeping",status:"complete",color:"#4ADE80"},
+          {n:2,name:"Document Collection",status:"complete",color:"#4ADE80"},
+          {n:3,name:"Preparation",status:"blocked",color:"#F87171"},
+          {n:4,name:"Review",status:"pending",color:"#475569"},
+          {n:5,name:"Filing",status:"pending",color:"#475569"},
+          {n:6,name:"Confirmation",status:"pending",color:"#475569"},
+        ].map((s,i)=>(
+          <div key={i} style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+            <div style={{width:20,height:20,borderRadius:"50%",background:s.color==="#4ADE80"?"#052E16":s.color==="#F87171"?"#2D0A0A":"#1E293B",border:`1.5px solid ${s.color}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,color:s.color,fontWeight:700,flexShrink:0}}>{s.n}</div>
+            <div style={{fontSize:11,color:s.color==="#475569"?"#475569":"#E2E8F0"}}>{s.name}</div>
+            {s.status==="blocked"&&<div style={{marginLeft:"auto",fontSize:10,color:"#F87171",background:"#2D0A0A",padding:"1px 6px",borderRadius:4}}>🔒 2 docs pending</div>}
+            {s.status==="complete"&&<div style={{marginLeft:"auto",fontSize:10,color:"#4ADE80"}}>✓</div>}
+          </div>
+        ))}
+      </div>
+    ),
   },
   {
-    tab: "Phase 3 — Automation",
-    badge: "✓ Live · Resend + pg_cron + R2",
-    title: "Automated reminders. Smart rules. R2 file storage.",
-    desc:
-      "Phase 3 makes AcctOS sticky. Transactional email sequences run automatically — Day 3 reminder, Day 6 escalation, deadline alerts. Automation rules engine fires background jobs via pg_cron. Cloudflare R2 replaces Supabase Storage for zero egress cost at scale.",
+    tab: "Phase 3",
+    label: "Communications",
+    badge: "✓ Live",
+    title: "Automated reminders, escalations, and file uploads.",
+    desc: "Resend-powered transactional email handles document reminders automatically. Reminder #2 escalates to the firm owner. Clients upload documents directly. Every email is logged in notification_log with Resend delivery tracking.",
     features: [
-      {
-        strong: "Automated document reminder sequence",
-        text: " — Day 3: Reminder #1 to client. Day 6: Reminder #2 + escalate to firm owner. Deadline < 5d: urgent alert.",
-      },
-      {
-        strong: "5 automation rules",
-        text: " — auto-create workflows, document reminders, escalation, deadline alerts, overdue flags — all configurable per firm",
-      },
-      {
-        strong: "Cloudflare R2 storage",
-        text: " — zero egress fees. 3-tier lifecycle: Standard (0–2yr) → Infrequent Access (2–4yr) → Archive (4–7yr, CRA requirement)",
-      },
-      {
-        strong: "Dashboard intelligence",
-        text: " — priority suggestions, GST anomaly detection (≥20% QoQ change), risk trend per client",
-      },
-      {
-        strong: "pg_cron background jobs",
-        text: " — runs inside Supabase Postgres. No external queue until 50+ firms justify complexity.",
-      },
+      "Automated reminder Day 3 — sends Reminder #1 if docs pending 3 days after Stage 2 starts",
+      "Escalation on Reminder #2 — firm owner CC'd automatically, no manual action needed",
+      "Client direct reminders — toggle on to route reminders directly to client email",
+      "File upload pipeline — presigned URLs to Supabase Storage or Cloudflare R2",
+      "8 automation toggles — all configurable in Settings → Automation, saved to DB immediately",
     ],
-    url: "app.acctos.com/settings/automation",
-    screen: "automation",
+    screen: (
+      <div style={{background:"#0F1117",borderRadius:10,padding:"14px",fontSize:11,fontFamily:"system-ui"}}>
+        <div style={{color:"#94A3B8",marginBottom:10,fontWeight:600}}>Automation Rules</div>
+        {[
+          {label:"Doc reminder Day 3",on:true},
+          {label:"Escalate on Reminder #2",on:true},
+          {label:"Deadline alert 3 days",on:true},
+          {label:"Overdue flag",on:true},
+          {label:"Require upload to receive",on:false},
+          {label:"Send reminders to client",on:false},
+          {label:"Auto-invoice on completion",on:false},
+        ].map((r,i)=>(
+          <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"5px 0",borderBottom:"1px solid #1E293B"}}>
+            <span style={{color:r.on?"#E2E8F0":"#475569"}}>{r.label}</span>
+            <div style={{width:28,height:16,borderRadius:8,background:r.on?"#2563EB":"#1E293B",position:"relative"}}>
+              <div style={{width:12,height:12,borderRadius:"50%",background:"white",position:"absolute",top:2,left:r.on?14:2,transition:"left 0.2s"}}/>
+            </div>
+          </div>
+        ))}
+      </div>
+    ),
   },
   {
-    tab: "Phase 4 — Integrations",
-    badge: "✓ Live · QBO + Stripe + Client Portal",
-    title: "QuickBooks sync. Client portal. Billing triggers.",
-    desc:
-      "Phase 4 plugs AcctOS into real firm workflows. When QuickBooks Online marks a period reconciled, Stage 1 advances automatically. Clients upload documents through a tokenised portal. Filing completion triggers a Stripe invoice.",
+    tab: "Phase 4",
+    label: "Integrations",
+    badge: "✓ Live",
+    title: "QBO sync, client portal, Stripe billing.",
+    desc: "QuickBooks Online and Zoho Books integrations auto-advance Stage 1 when reconciliation completes. Clients upload documents through a secure token-gated portal. Stripe handles firm subscription billing.",
     features: [
-      {
-        strong: "QuickBooks Online OAuth",
-        text: " — reconciliation webhook auto-advances Stage 1 gate. Zoho Books supported as alternative.",
-      },
-      {
-        strong: "Client portal (no login required)",
-        text: " — tokenised URL sent to client. They see pending docs, upload directly, and the checklist auto-updates in AcctOS.",
-      },
-      {
-        strong: "Stripe billing",
-        text: " — Starter $49/mo · Growth $149/mo · Scale $299/mo (all CAD, firm-flat). Stage 6 completion triggers invoice automatically.",
-      },
-      {
-        strong: "Payroll Remittances template",
-        text: " — monthly and bi-weekly cycles. CRA payroll deadlines built in. Same engine, new configuration.",
-      },
-      {
-        strong: "Full webhook suite",
-        text: " — QBO reconciliation events, Zoho Books events, Stripe subscription lifecycle, Resend delivery events.",
-      },
+      "QBO + Zoho Books OAuth — bookkeeping reconciliation auto-advances GST Stage 1, no manual action",
+      "Client portal — 96-char token-gated upload link, no login required, marks documents received automatically",
+      "Stripe billing — $49/$149/$299 CAD flat firm pricing, monthly or annual, customer portal for self-serve changes",
+      "Per-job invoicing — Stripe invoices sent to business clients using firm's own Stripe Connect account",
+      "Time tracking — start/stop timer or manual log, billable minutes shown per workflow",
     ],
-    url: "app.acctos.com/settings/integrations",
-    screen: "integrations",
+    screen: (
+      <div style={{background:"#0F1117",borderRadius:10,padding:"14px",fontSize:11,fontFamily:"system-ui"}}>
+        <div style={{color:"#94A3B8",marginBottom:10,fontWeight:600}}>Integrations</div>
+        {[
+          {name:"QuickBooks Online",status:"Connected",detail:"Maple Contracting synced · 2h ago",color:"#4ADE80"},
+          {name:"Zoho Books",status:"Not connected",detail:"Click to connect",color:"#475569"},
+          {name:"Stripe Billing",status:"Active · Growth",detail:"$149/mo · renews May 1",color:"#4ADE80"},
+          {name:"Cloudflare R2",status:"Active",detail:"client-documents · 12 files",color:"#4ADE80"},
+        ].map((item,i)=>(
+          <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:"1px solid #1E293B"}}>
+            <div>
+              <div style={{color:item.color==="#475569"?"#475569":"#E2E8F0",fontWeight:500}}>{item.name}</div>
+              <div style={{color:"#475569",fontSize:10}}>{item.detail}</div>
+            </div>
+            <span style={{fontSize:10,color:item.color,background:item.color==="#4ADE80"?"#052E16":"#1E293B",padding:"2px 8px",borderRadius:4}}>{item.status}</span>
+          </div>
+        ))}
+      </div>
+    ),
   },
 ];
 
-function ScreenDashboard() {
-  return (
-    <div style={{ fontFamily: "system-ui, sans-serif", fontSize: 12, background: "#F8FAFC", height: 320, display: "flex", overflow: "hidden" }}>
-      {/* Sidebar */}
-      <div style={{ width: 150, background: "#fff", borderRight: "1px solid #E2E8F0", padding: "10px 0", flexShrink: 0 }}>
-        <div style={{ padding: "8px 12px", borderBottom: "1px solid #E2E8F0", marginBottom: 6, display: "flex", alignItems: "center", gap: 6 }}>
-          <div style={{ width: 22, height: 22, background: "#2563EB", borderRadius: 5, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, color: "#fff" }}>A</div>
-          <span style={{ fontSize: 11, fontWeight: 700, color: "#0F172A" }}>AcctOS</span>
-        </div>
-        {[["⊞", "Command Centre", true], ["👥", "Clients", false], ["⚡", "Workflows", false], ["📅", "Deadlines", false], ["🗂", "Templates", false], ["⚙", "Settings", false]].map(([icon, label, active]) => (
-          <div key={String(label)} style={{ padding: "6px 12px", fontSize: 11, color: active ? "#2563EB" : "#475569", background: active ? "#EFF6FF" : "transparent", fontWeight: active ? 600 : 400, margin: "1px 6px", borderRadius: 6, display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ fontSize: 10 }}>{String(icon)}</span>{String(label)}
-          </div>
-        ))}
-      </div>
-      {/* Main */}
-      <div style={{ flex: 1, padding: 16, overflow: "hidden" }}>
-        <div style={{ fontSize: 14, fontWeight: 700, color: "#0F172A", marginBottom: 2 }}>Command Centre</div>
-        <div style={{ fontSize: 10, color: "#94A3B8", marginBottom: 10 }}>October 2025 · 6 active clients · Ontario (CRA timezone)</div>
-        {/* Alert */}
-        <div style={{ background: "#FEE2E2", border: "1px solid #FCA5A5", borderRadius: 6, padding: "6px 10px", fontSize: 10, color: "#DC2626", marginBottom: 6, display: "flex", gap: 6 }}>✕ 1 overdue — CRA deadline passed. File immediately.</div>
-        <div style={{ background: "#FEF3C7", border: "1px solid #FCD34D", borderRadius: 6, padding: "6px 10px", fontSize: 10, color: "#B45309", marginBottom: 10, display: "flex", gap: 6 }}>▲ 2 at risk — will miss deadline if nothing changes today.</div>
-        {/* Tiles */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, marginBottom: 12 }}>
-          {[["Active", "5", "#2563EB", "#EFF6FF"], ["On Track", "2", "#16A34A", "#DCFCE7"], ["At Risk", "2", "#F59E0B", "#FEF3C7"], ["Overdue", "1", "#DC2626", "#FEE2E2"]].map(([l, v, c, bg]) => (
-            <div key={String(l)} style={{ background: String(bg), borderRadius: 8, padding: "8px 10px", border: `1px solid ${String(c)}33` }}>
-              <div style={{ fontSize: 9, fontWeight: 600, color: String(c), marginBottom: 2 }}>{String(l)}</div>
-              <div style={{ fontSize: 20, fontWeight: 700, color: String(c), lineHeight: 1 }}>{String(v)}</div>
-            </div>
-          ))}
-        </div>
-        {/* Table */}
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 10 }}>
-          <thead>
-            <tr style={{ background: "#F8FAFC" }}>
-              {["Client", "Status", "Stage", "Deadline"].map(h => (
-                <th key={h} style={{ padding: "5px 8px", textAlign: "left", color: "#94A3B8", fontWeight: 600, fontSize: 9, textTransform: "uppercase", borderBottom: "1px solid #E2E8F0" }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {[
-              { name: "Patel & Sons", city: "Mississauga, ON", badge: "Overdue", bc: "#DC2626", bb: "#FEE2E2", dots: ["#16A34A","#16A34A","#16A34A","#16A34A","#DC2626","#E2E8F0"], dl: "75d over", dc: "#DC2626" },
-              { name: "Sunrise Bakery", city: "Ottawa, ON", badge: "At Risk", bc: "#F59E0B", bb: "#FEF3C7", dots: ["#16A34A","#DC2626","#E2E8F0","#E2E8F0","#E2E8F0","#E2E8F0"], dl: "17d", dc: "#F59E0B" },
-              { name: "Maple Contracting", city: "Ottawa, ON", badge: "On Track", bc: "#16A34A", bb: "#DCFCE7", dots: ["#16A34A","#16A34A","#2563EB","#E2E8F0","#E2E8F0","#E2E8F0"], dl: "17d", dc: "#475569" },
-            ].map(row => (
-              <tr key={row.name} style={{ borderBottom: "1px solid #F1F5F9" }}>
-                <td style={{ padding: "6px 8px" }}><div style={{ fontWeight: 600, color: "#0F172A" }}>{row.name}</div><div style={{ color: "#94A3B8", fontSize: 9 }}>{row.city}</div></td>
-                <td style={{ padding: "6px 8px" }}><span style={{ background: row.bb, color: row.bc, fontSize: 9, fontWeight: 600, padding: "2px 7px", borderRadius: 10 }}>{row.badge}</span></td>
-                <td style={{ padding: "6px 8px" }}><div style={{ display: "flex", gap: 2 }}>{row.dots.map((c, i) => <div key={i} style={{ width: 7, height: 7, borderRadius: "50%", background: c }} />)}</div></td>
-                <td style={{ padding: "6px 8px", color: row.dc, fontWeight: 600 }}>{row.dl}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-function ScreenWorkflow() {
-  return (
-    <div style={{ fontFamily: "system-ui, sans-serif", fontSize: 12, background: "#F8FAFC", height: 320, display: "flex", overflow: "hidden" }}>
-      <div style={{ width: 150, background: "#fff", borderRight: "1px solid #E2E8F0", padding: "10px 0", flexShrink: 0 }}>
-        <div style={{ padding: "8px 12px", borderBottom: "1px solid #E2E8F0", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
-          <div style={{ width: 22, height: 22, background: "#2563EB", borderRadius: 5, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, color: "#fff" }}>A</div>
-          <span style={{ fontSize: 11, fontWeight: 700, color: "#0F172A" }}>AcctOS</span>
-        </div>
-        <div style={{ padding: "0 8px 8px", borderBottom: "1px solid #E2E8F0", marginBottom: 6 }}>
-          <div style={{ fontSize: 9, fontWeight: 600, color: "#94A3B8", textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 6, padding: "0 4px" }}>Team</div>
-          {[["PW", "Patrick W.", "#DBEAFE", "#1D4ED8", "Owner"], ["KS", "Kiera S.", "#DCFCE7", "#15803D", "Senior"], ["JR", "James R.", "#FEF3C7", "#B45309", "Acct."], ["RH", "Reece H.", "#EDE9FE", "#6D28D9", "Admin"]].map(([init, name, bg, fg, role]) => (
-            <div key={String(init)} style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 4 }}>
-              <div style={{ width: 18, height: 18, borderRadius: "50%", background: String(bg), color: String(fg), fontSize: 8, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{String(init)}</div>
-              <div style={{ fontSize: 10, color: "#0F172A", flex: 1 }}>{String(name)}</div>
-              <div style={{ fontSize: 8, background: "#F1F5F9", color: "#64748B", padding: "1px 5px", borderRadius: 4 }}>{String(role)}</div>
-            </div>
-          ))}
-        </div>
-        {[["📋", "Workflow", true], ["✓", "Tasks", false], ["📄", "Documents", false], ["📊", "Activity", false]].map(([icon, label, active]) => (
-          <div key={String(label)} style={{ padding: "6px 12px", fontSize: 11, color: active ? "#2563EB" : "#475569", background: active ? "#EFF6FF" : "transparent", fontWeight: active ? 600 : 400, margin: "1px 6px", borderRadius: 6, display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ fontSize: 10 }}>{String(icon)}</span>{String(label)}
-          </div>
-        ))}
-      </div>
-      <div style={{ flex: 1, padding: 14, overflow: "hidden" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A" }}>Sunrise Bakery Inc.</div>
-            <div style={{ fontSize: 9, color: "#94A3B8" }}>Corporation · Monthly · GST/HST — October 2025</div>
-          </div>
-          <span style={{ background: "#FEF3C7", color: "#F59E0B", fontSize: 9, fontWeight: 600, padding: "2px 8px", borderRadius: 10 }}>At Risk</span>
-        </div>
-        <div style={{ background: "#FEF3C7", border: "1px solid #FCD34D", borderRadius: 6, padding: "6px 10px", fontSize: 10, color: "#B45309", marginBottom: 10 }}>⚑ Document blocker — Reminder #2 sent Oct 9. Stage 3 hard-blocked.</div>
-        {[
-          { n: "✓", label: "Stage 1: Bookkeeping", sub: "Complete — Oct 2", badge: ["Complete", "#16A34A", "#DCFCE7"], gate: null, sc: "#16A34A", sb: "#DCFCE7" },
-          { n: "🔒", label: "Stage 2: Document Collection", sub: "Reminder #2 sent Oct 9", badge: ["Blocked", "#DC2626", "#FEE2E2"], gate: { text: "🔒 Hard Stop — 3 docs pending. Stage 3 cannot begin.", red: true }, sc: "#DC2626", sb: "#FEE2E2" },
-          { n: "3", label: "Stage 3: Preparation", sub: null, badge: ["Pending", "#94A3B8", "#F1F5F9"], gate: { text: "🔒 Blocked upstream — resolve document collection first.", red: true }, sc: "#E2E8F0", sb: "#F1F5F9" },
-          { n: "4", label: "Stage 4: Review", sub: null, badge: ["Pending", "#94A3B8", "#F1F5F9"], gate: null, sc: "#E2E8F0", sb: "#F1F5F9" },
-          { n: "5", label: "Stage 5: Filing", sub: null, badge: ["Pending", "#94A3B8", "#F1F5F9"], gate: { text: "🔒 Review approval required before filing", red: false }, sc: "#E2E8F0", sb: "#F1F5F9" },
-        ].map((s, i) => (
-          <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8, paddingBottom: 8, borderBottom: "1px solid #F1F5F9", marginBottom: 2 }}>
-            <div style={{ width: 20, height: 20, borderRadius: "50%", background: s.sb, border: `1.5px solid ${s.sc}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 700, color: s.sc, flexShrink: 0, marginTop: 1 }}>{s.n}</div>
-            <div style={{ flex: 1 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div style={{ fontSize: 10, fontWeight: 600, color: "#0F172A" }}>{s.label}</div>
-                <span style={{ background: s.badge[2] as string, color: s.badge[1] as string, fontSize: 9, fontWeight: 600, padding: "1px 6px", borderRadius: 10 }}>{s.badge[0]}</span>
-              </div>
-              {s.sub && <div style={{ fontSize: 9, color: "#94A3B8" }}>{s.sub}</div>}
-              {s.gate && <div style={{ background: s.gate.red ? "#FFF1F2" : "#EFF6FF", border: `1px solid ${s.gate.red ? "#FECDD3" : "#BFDBFE"}`, borderRadius: 5, padding: "3px 7px", fontSize: 9, color: s.gate.red ? "#DC2626" : "#2563EB", marginTop: 3 }}>{s.gate.text}</div>}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function ScreenAutomation() {
-  return (
-    <div style={{ fontFamily: "system-ui, sans-serif", fontSize: 12, background: "#F8FAFC", height: 320, display: "flex", overflow: "hidden" }}>
-      <div style={{ width: 150, background: "#fff", borderRight: "1px solid #E2E8F0", padding: "10px 0", flexShrink: 0 }}>
-        <div style={{ padding: "8px 12px", borderBottom: "1px solid #E2E8F0", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
-          <div style={{ width: 22, height: 22, background: "#2563EB", borderRadius: 5, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, color: "#fff" }}>A</div>
-          <span style={{ fontSize: 11, fontWeight: 700, color: "#0F172A" }}>AcctOS</span>
-        </div>
-        <div style={{ padding: "0 8px" }}>
-          <div style={{ fontSize: 9, fontWeight: 600, color: "#94A3B8", textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 6, padding: "0 4px" }}>Settings</div>
-          {[["Firm Profile", false], ["Automation", true], ["Email Templates", false], ["Billing", false], ["Team", false]].map(([label, active]) => (
-            <div key={String(label)} style={{ fontSize: 10, color: active ? "#2563EB" : "#475569", fontWeight: active ? 600 : 400, padding: "5px 8px", background: active ? "#EFF6FF" : "transparent", borderRadius: 5, marginBottom: 2 }}>{String(label)}</div>
-          ))}
-        </div>
-      </div>
-      <div style={{ flex: 1, padding: 14, overflow: "hidden" }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A", marginBottom: 2 }}>Automation Rules</div>
-        <div style={{ fontSize: 10, color: "#94A3B8", marginBottom: 12 }}>5 rules active · all jobs running via pg_cron</div>
-        {[
-          ["Auto-create workflows at cycle start", "Monthly", "#22C55E"],
-          ["Send document Reminder #1 after 3 days", "Day 3", "#22C55E"],
-          ["Escalate to owner on Reminder #2", "Day 6 ⚑", "#F59E0B"],
-          ["Deadline alert 3 days before CRA due date", "−3d ⚑", "#DC2626"],
-          ["Flag overdue clients on dashboard", "Daily", "#22C55E"],
-        ].map(([label, timing, dotColor]) => (
-          <div key={String(label)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 10px", background: "#fff", border: "1px solid #E2E8F0", borderRadius: 7, marginBottom: 6 }}>
-            <div style={{ width: 8, height: 8, borderRadius: "50%", background: String(dotColor), flexShrink: 0 }} />
-            <div style={{ flex: 1, fontSize: 10, color: "#0F172A", fontWeight: 500 }}>{String(label)}</div>
-            <div style={{ fontSize: 9, color: "#94A3B8" }}>{String(timing)}</div>
-          </div>
-        ))}
-        <div style={{ marginTop: 8, padding: 8, background: "#F0FDF4", border: "1px solid #BBF7D0", borderRadius: 6 }}>
-          <div style={{ fontSize: 10, fontWeight: 600, color: "#15803D", marginBottom: 4 }}>📧 Email log — Sunrise Bakery</div>
-          {["✓ Initial request — Oct 3", "✓ Reminder #1 — Oct 6", "✓ Reminder #2 + Owner escalation — Oct 9"].map(line => (
-            <div key={line} style={{ fontSize: 9, color: "#166534", marginBottom: 2 }}>{line}</div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ScreenIntegrations() {
-  return (
-    <div style={{ fontFamily: "system-ui, sans-serif", fontSize: 12, background: "#F8FAFC", height: 320, display: "flex", overflow: "hidden" }}>
-      <div style={{ width: 150, background: "#fff", borderRight: "1px solid #E2E8F0", padding: "10px 0", flexShrink: 0 }}>
-        <div style={{ padding: "8px 12px", borderBottom: "1px solid #E2E8F0", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
-          <div style={{ width: 22, height: 22, background: "#2563EB", borderRadius: 5, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, color: "#fff" }}>A</div>
-          <span style={{ fontSize: 11, fontWeight: 700, color: "#0F172A" }}>AcctOS</span>
-        </div>
-        <div style={{ padding: "0 8px" }}>
-          <div style={{ fontSize: 9, fontWeight: 600, color: "#94A3B8", textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 6, padding: "0 4px" }}>Settings</div>
-          {[["Firm Profile", false], ["Integrations", true], ["Client Portal", false], ["Billing", false], ["Automation", false], ["Team", false]].map(([label, active]) => (
-            <div key={String(label)} style={{ fontSize: 10, color: active ? "#2563EB" : "#475569", fontWeight: active ? 600 : 400, padding: "5px 8px", background: active ? "#EFF6FF" : "transparent", borderRadius: 5, marginBottom: 2 }}>{String(label)}</div>
-          ))}
-        </div>
-      </div>
-      <div style={{ flex: 1, padding: 14, overflow: "hidden" }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A", marginBottom: 12 }}>Integrations</div>
-        {[
-          { abbr: "QB", name: "QuickBooks Online", sub: "Jensen & Associates — Connected · Last sync Oct 14", badge: "Connected", bc: "#16A34A", bb: "#DCFCE7", bg: "#2CA01C" },
-          { abbr: "St", name: "Stripe Billing", sub: "Growth plan active · $149/mo CAD", badge: "Active", bc: "#16A34A", bb: "#DCFCE7", bg: "#635BFF" },
-          { abbr: "R2", name: "Cloudflare R2 Storage", sub: "Zero egress · 3-tier lifecycle · CRA 7yr retention", badge: "Active", bc: "#16A34A", bb: "#DCFCE7", bg: "#F6821F" },
-          { abbr: "Zh", name: "Zoho Books", sub: "Alternative to QBO — not connected", badge: "Available", bc: "#64748B", bb: "#F1F5F9", bg: "#E41E2B" },
-        ].map(row => (
-          <div key={row.name} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", background: "#fff", border: "1px solid #E2E8F0", borderRadius: 8, marginBottom: 7 }}>
-            <div style={{ width: 28, height: 28, borderRadius: 6, background: row.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 700, color: "#fff", flexShrink: 0 }}>{row.abbr}</div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: "#0F172A" }}>{row.name}</div>
-              <div style={{ fontSize: 9, color: "#94A3B8" }}>{row.sub}</div>
-            </div>
-            <span style={{ background: row.bb, color: row.bc, fontSize: 9, fontWeight: 600, padding: "2px 7px", borderRadius: 10 }}>{row.badge}</span>
-          </div>
-        ))}
-        <div style={{ padding: "8px 10px", background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 6, fontSize: 9, color: "#1D4ED8" }}>
-          🔗 <strong>Client Portal active</strong> — tokenised links sent for 3 clients this month. Maple Contracting uploaded 4/4 docs via portal.
-        </div>
-      </div>
-    </div>
-  );
-}
-
-const SCREENS: Record<string, React.ReactNode> = {
-  dashboard: <ScreenDashboard />,
-  workflow: <ScreenWorkflow />,
-  automation: <ScreenAutomation />,
-  integrations: <ScreenIntegrations />,
-};
-
 export default function PhaseTabs() {
   const [active, setActive] = useState(0);
-  const phase = PHASES[active];
+  const ph = PHASES[active];
 
   return (
-    <div>
-      {/* Tab bar */}
-      <div style={{ display: "flex", gap: 4, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: 5, marginBottom: 40, overflowX: "auto" }}>
-        {PHASES.map((p, i) => (
-          <button
-            key={i}
-            onClick={() => setActive(i)}
-            style={{
-              flex: 1,
-              minWidth: 120,
-              padding: "10px 16px",
-              border: "none",
-              borderRadius: 8,
-              background: active === i ? "#0D9488" : "transparent",
-              color: active === i ? "#fff" : "#94A3B8",
-              fontFamily: "inherit",
-              fontSize: 13,
-              fontWeight: active === i ? 600 : 500,
-              cursor: "pointer",
-              whiteSpace: "nowrap",
-              transition: "all .18s",
-            }}
-          >
-            {p.tab}
+    <div style={{maxWidth:960,margin:"0 auto"}}>
+      {/* Tab buttons */}
+      <div style={{display:"flex",gap:4,marginBottom:32,background:"#0F1117",padding:4,borderRadius:10,border:"1px solid #1E293B"}}>
+        {PHASES.map((p,i)=>(
+          <button key={i} onClick={()=>setActive(i)} style={{flex:1,padding:"10px 8px",borderRadius:8,border:"none",cursor:"pointer",background:active===i?"#1E293B":"transparent",transition:"all 0.15s"}}>
+            <div style={{fontSize:11,fontWeight:700,color:active===i?"#38BDF8":"#475569",marginBottom:2}}>{p.tab}</div>
+            <div style={{fontSize:10,color:active===i?"#94A3B8":"#334155"}}>{p.label}</div>
           </button>
         ))}
       </div>
 
       {/* Content */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 48, alignItems: "start" }}>
-        {/* Left: info */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:40,alignItems:"start"}}>
         <div>
-          <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(34,197,94,0.12)", border: "1px solid rgba(34,197,94,0.3)", borderRadius: 20, padding: "4px 12px", fontSize: 11, fontWeight: 600, color: "#4ADE80", marginBottom: 16, letterSpacing: ".04em" }}>
-            {phase.badge}
+          <div style={{display:"inline-flex",alignItems:"center",gap:6,background:"#052E16",border:"1px solid #166534",borderRadius:20,padding:"4px 12px",fontSize:11,color:"#4ADE80",fontWeight:600,marginBottom:16}}>
+            <span style={{width:6,height:6,borderRadius:"50%",background:"#4ADE80",display:"inline-block"}}/>
+            {ph.badge}
           </div>
-          <h3 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: 26, fontWeight: 700, color: "#fff", marginBottom: 10, lineHeight: 1.25 }}>
-            {phase.title}
-          </h3>
-          <p style={{ color: "#94A3B8", fontSize: 14, lineHeight: 1.75, marginBottom: 24 }}>{phase.desc}</p>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {phase.features.map((f, i) => (
-              <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10, fontSize: 13 }}>
-                <div style={{ width: 18, height: 18, background: "rgba(13,148,136,0.2)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 2 }}>
-                  <div style={{ width: 6, height: 6, background: "#14B8A6", borderRadius: "50%" }} />
-                </div>
-                <span style={{ color: "#F0F6FF", lineHeight: 1.55 }}>
-                  <strong style={{ color: "#fff", fontWeight: 600 }}>{f.strong}</strong>
-                  {f.text}
-                </span>
+          <h3 style={{fontSize:20,fontWeight:700,color:"#F1F5F9",margin:"0 0 12px",lineHeight:1.3}}>{ph.title}</h3>
+          <p style={{fontSize:13,color:"#64748B",lineHeight:1.7,margin:"0 0 20px"}}>{ph.desc}</p>
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {ph.features.map((f,i)=>(
+              <div key={i} style={{display:"flex",gap:10,alignItems:"flex-start"}}>
+                <span style={{color:"#2563EB",fontWeight:700,flexShrink:0,marginTop:1}}>→</span>
+                <span style={{fontSize:12,color:"#94A3B8",lineHeight:1.6}}>{f}</span>
               </div>
             ))}
           </div>
         </div>
-
-        {/* Right: screenshot */}
-        <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, overflow: "hidden" }}>
-          {/* Browser chrome */}
-          <div style={{ background: "rgba(255,255,255,0.06)", padding: "10px 14px", display: "flex", alignItems: "center", gap: 8, borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
-            <div style={{ display: "flex", gap: 5 }}>
-              {["#EF4444", "#F59E0B", "#22C55E"].map(c => <div key={c} style={{ width: 8, height: 8, borderRadius: "50%", background: c }} />)}
-            </div>
-            <div style={{ flex: 1, background: "rgba(255,255,255,0.07)", borderRadius: 5, padding: "4px 10px", fontSize: 11, color: "#64748B", textAlign: "center" }}>
-              {phase.url}
-            </div>
-          </div>
-          {SCREENS[phase.screen]}
+        <div>
+          {ph.screen}
         </div>
       </div>
     </div>

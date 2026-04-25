@@ -3,348 +3,258 @@ import React from "react";
 import PhaseTabs from "@/components/landing/PhaseTabs";
 
 export const metadata: Metadata = {
-  title: "AcctOS — Canadian Accounting Operations",
-  description:
-    "The workflow intelligence platform built specifically for Canadian accounting firms. CRA deadlines native. 5-condition risk engine. Gate enforcement that prevents errors before they become penalties.",
-  openGraph: {
-    title: "AcctOS — We Don't Track Work. We Predict Risk.",
-    description:
-      "Phases 0–4 production-ready. GST/HST workflows, multi-user roles, automated reminders, QuickBooks integration, client portal. Built for Ontario accounting firms.",
-    siteName: "AcctOS",
-  },
+  title: "AcctOS — Workflow Intelligence for Canadian Accounting Firms",
+  description: "CRA deadlines native. 5-condition risk engine. Gate enforcement that prevents errors before they become penalties.",
 };
 
-// ─── Inline style helpers (avoids extra CSS files) ───────────────────────────
-const S = {
-  // Layout
-  page: {
-    background: "#0D1B2A",
-    color: "#fff",
-    fontFamily: "'DM Sans', system-ui, -apple-system, sans-serif",
-    minHeight: "100vh",
-    overflowX: "hidden" as const,
-  },
-  container: { maxWidth: 1200, margin: "0 auto", padding: "0 40px" },
+const S: Record<string, React.CSSProperties> = {
+  page:       { fontFamily: "'DM Sans', system-ui, sans-serif", background: "#080C14", color: "#F1F5F9", minHeight: "100vh" },
+  nav:        { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "20px 48px", borderBottom: "1px solid #1E293B", position: "sticky", top: 0, background: "rgba(8,12,20,0.95)", backdropFilter: "blur(12px)", zIndex: 100 },
+  logoMark:   { width: 32, height: 32, borderRadius: 8, background: "#2563EB", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 800, color: "white" },
+  logoText:   { fontSize: 18, fontWeight: 700, color: "#F1F5F9", marginLeft: 10 },
+  navLinks:   { display: "flex", gap: 32, listStyle: "none", margin: 0, padding: 0 },
+  navLink:    { fontSize: 14, color: "#64748B", textDecoration: "none", cursor: "pointer" },
+  navCta:     { background: "#2563EB", color: "white", border: "none", borderRadius: 8, padding: "8px 20px", fontSize: 14, fontWeight: 600, cursor: "pointer" },
+  hero:       { maxWidth: 1200, margin: "0 auto", padding: "80px 48px 60px", display: "grid", gridTemplateColumns: "1fr 420px", gap: 64, alignItems: "center" },
+  badge:      { display: "inline-flex", alignItems: "center", gap: 8, background: "#0F1729", border: "1px solid #1E3A5F", borderRadius: 20, padding: "6px 14px", fontSize: 12, color: "#38BDF8", fontWeight: 600, marginBottom: 24 },
+  badgeDot:   { width: 6, height: 6, borderRadius: "50%", background: "#38BDF8" },
+  h1:         { fontSize: 52, fontWeight: 800, lineHeight: 1.1, margin: "0 0 20px", color: "#F1F5F9", letterSpacing: "-0.02em" },
+  h1accent:   { color: "#2563EB" },
+  heroSub:    { fontSize: 16, color: "#64748B", lineHeight: 1.7, margin: "0 0 36px", maxWidth: 520 },
+  statsRow:   { display: "flex", gap: 36 },
+  statNum:    { fontSize: 28, fontWeight: 800, color: "#F1F5F9" },
+  statLabel:  { fontSize: 12, color: "#475569", marginTop: 2 },
+  loginCard:  { background: "#0F1117", border: "1px solid #1E293B", borderRadius: 16, padding: "36px 32px", boxShadow: "0 24px 48px rgba(0,0,0,0.4)" },
+  loginTitle: { fontSize: 20, fontWeight: 700, color: "#F1F5F9", marginBottom: 4 },
+  loginSub:   { fontSize: 13, color: "#475569", marginBottom: 28 },
+  label:      { fontSize: 12, fontWeight: 600, color: "#64748B", display: "block", marginBottom: 6 },
+  input:      { width: "100%", padding: "10px 14px", background: "#080C14", border: "1px solid #1E293B", borderRadius: 8, fontSize: 14, color: "#F1F5F9", outline: "none", boxSizing: "border-box" as const },
+  loginBtn:   { width: "100%", padding: "12px", background: "#2563EB", color: "white", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: "pointer", marginTop: 20 },
+  divider:    { textAlign: "center" as const, color: "#334155", fontSize: 12, margin: "16px 0", position: "relative" as const },
+  demoBtn:    { width: "100%", padding: "11px", background: "transparent", color: "#94A3B8", border: "1px solid #1E293B", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" },
+  loginNote:  { fontSize: 12, color: "#475569", textAlign: "center" as const, marginTop: 16 },
+  section:    { maxWidth: 1200, margin: "0 auto", padding: "80px 48px" },
+  sectionLbl: { fontSize: 12, fontWeight: 700, color: "#2563EB", textTransform: "uppercase" as const, letterSpacing: "0.1em", marginBottom: 12 },
+  sectionH2:  { fontSize: 36, fontWeight: 800, color: "#F1F5F9", margin: "0 0 12px", letterSpacing: "-0.02em" },
+  sectionSub: { fontSize: 15, color: "#64748B", margin: "0 0 56px", lineHeight: 1.7 },
+  dividerLine:{ borderTop: "1px solid #1E293B", margin: "0 48px" },
+  pricingGrid:{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 24 },
+  planCard:   { background: "#0F1117", border: "1px solid #1E293B", borderRadius: 16, padding: "32px 28px" },
+  planCardH:  { background: "#0F1729", border: "1px solid #1E3A5F", borderRadius: 16, padding: "32px 28px" },
+  planName:   { fontSize: 14, fontWeight: 700, color: "#64748B", textTransform: "uppercase" as const, letterSpacing: "0.08em", marginBottom: 16 },
+  planPrice:  { fontSize: 40, fontWeight: 800, color: "#F1F5F9", lineHeight: 1 },
+  planPer:    { fontSize: 13, color: "#475569", marginTop: 4, marginBottom: 24 },
+  planAnnual: { fontSize: 12, color: "#4ADE80", marginBottom: 28 },
+  planFeats:  { display: "flex", flexDirection: "column" as const, gap: 10 },
+  planFeat:   { fontSize: 13, color: "#94A3B8", display: "flex", gap: 8, alignItems: "flex-start" },
+  planBtn:    { width: "100%", padding: "11px", background: "transparent", color: "#94A3B8", border: "1px solid #1E293B", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", marginTop: 28 },
+  planBtnH:   { width: "100%", padding: "11px", background: "#2563EB", color: "white", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer", marginTop: 28 },
+  table:      { width: "100%", borderCollapse: "collapse" as const },
+  th:         { padding: "12px 16px", fontSize: 12, fontWeight: 700, color: "#475569", textTransform: "uppercase" as const, letterSpacing: "0.06em", textAlign: "left" as const, borderBottom: "1px solid #1E293B" },
+  thUs:       { padding: "12px 16px", fontSize: 12, fontWeight: 700, color: "#38BDF8", textTransform: "uppercase" as const, letterSpacing: "0.06em", textAlign: "left" as const, borderBottom: "1px solid #1E3A5F", background: "#0F1729" },
+  td:         { padding: "11px 16px", fontSize: 13, color: "#64748B", borderBottom: "1px solid #0F1117" },
+  tdUs:       { padding: "11px 16px", fontSize: 13, color: "#94A3B8", borderBottom: "1px solid #0F1117", background: "#0C1120" },
+  tdFeat:     { padding: "11px 16px", fontSize: 13, color: "#94A3B8", borderBottom: "1px solid #0F1117", fontWeight: 500 },
+  ctaSection: { background: "#0F1729", borderTop: "1px solid #1E3A5F", borderBottom: "1px solid #1E3A5F", padding: "80px 48px", textAlign: "center" as const },
+  footer:     { padding: "32px 48px", borderTop: "1px solid #1E293B", display: "flex", justifyContent: "space-between", alignItems: "center" },
+};
 
-  // Nav
-  nav: {
-    position: "sticky" as const,
-    top: 0,
-    zIndex: 100,
-    background: "rgba(13,27,42,0.92)",
-    backdropFilter: "blur(12px)",
-    borderBottom: "1px solid rgba(255,255,255,0.08)",
-    padding: "0 40px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    height: 58,
-  },
-  navLogo: { display: "flex", alignItems: "center", gap: 10 },
-  logoMark: {
-    width: 32, height: 32, background: "#0D9488", borderRadius: 8,
-    display: "flex", alignItems: "center", justifyContent: "center",
-    fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 700, color: "#fff", flexShrink: 0,
-  },
-  logoText: { fontFamily: "Georgia, serif", fontSize: 17, fontWeight: 700, color: "#fff" },
-  navLinks: { display: "flex", gap: 28, alignItems: "center" },
-  navLink: { color: "#94A3B8", textDecoration: "none", fontSize: 13, fontWeight: 500 },
-  navCta: {
-    background: "#0D9488", color: "#fff", border: "none",
-    padding: "8px 18px", borderRadius: 8,
-    fontFamily: "'DM Sans', system-ui, sans-serif", fontSize: 13, fontWeight: 600, cursor: "pointer",
-  },
-} as const;
+const COMPARE = [
+  { feature: "Canada-native CRA deadlines",    uku: "❌ Manual",     tax: "❌ Templates",  us: "✅ Built in — GST, T1, T2, Payroll" },
+  { feature: "At Risk prediction engine",       uku: "❌ None",       tax: "❌ None",        us: "✅ 5-condition, per workflow, real-time" },
+  { feature: "Stage gate enforcement",          uku: "❌ None",       tax: "❌ None",        us: "✅ Server-side hard stops with reasons" },
+  { feature: "Corp vs sole prop branching",     uku: "❌ No",         tax: "❌ No",          us: "✅ ITC, dual review, simplified checklist" },
+  { feature: "Client portal for doc upload",    uku: "❌ Email only", tax: "✅ Full portal", us: "✅ Token-gated, no login needed" },
+  { feature: "QBO / Zoho integration",          uku: "✅ QBO, Xero",  tax: "✅ QBO only",    us: "✅ QBO + Zoho — auto-advances Stage 1" },
+  { feature: "Time tracking",                   uku: "✅ Full",       tax: "✅ Full",        us: "✅ Start/stop timer + manual log" },
+  { feature: "Per-job invoicing",               uku: "✅ Yes",        tax: "✅ Yes",         us: "✅ Stripe invoice per workflow" },
+  { feature: "Flat firm pricing (CAD)",         uku: "❌ Per user",   tax: "❌ Per user",    us: "✅ Only platform with flat CAD pricing" },
+  { feature: "Setup time",                      uku: "Hours",         tax: "Days",          us: "✅ Minutes — add client, template applied" },
+];
 
-function LogoMark() {
+export default function LandingPage() {
   return (
-    <div style={S.logoMark as React.CSSProperties}>A</div>
-  );
-}
-
-// ─── Feature card ─────────────────────────────────────────────────────────────
-function FeatCard({ icon, title, desc }: { icon: string; title: string; desc: string }) {
-  return (
-    <div style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: 22 }}>
-      <div style={{ width: 36, height: 36, background: "rgba(13,148,136,0.15)", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 14, fontSize: 16 }}>
-        {icon}
-      </div>
-      <div style={{ fontSize: 15, fontWeight: 600, color: "#fff", marginBottom: 6 }}>{title}</div>
-      <div style={{ fontSize: 13, color: "#94A3B8", lineHeight: 1.6 }}>{desc}</div>
-    </div>
-  );
-}
-
-// ─── Comparison table ─────────────────────────────────────────────────────────
-const COMP_ROWS = [
-  ["CRA deadlines native",          "Manual setup",   "Generic",         true],
-  ["5-condition At Risk algorithm",  "Simple overdue", "Basic flag",      true],
-  ["Gate enforcement with reasons",  "—",              "—",               true],
-  ["Corp vs sole prop branching",    "—",              "—",               true],
-  ["Automated document reminders",   "Manual",         "Basic",           true],
-  ["QuickBooks Online integration",  "Add-on",         "Limited",         true],
-  ["Client upload portal",           "Paid add-on",    "Yes",             true],
-  ["Pricing (Ontario firms)",        "$49+ USD/user",  "$99+ USD/user",   true],
-  ["Setup time",                     "Days",           "Hours",           true],
-] as const;
-
-export default function HomePage() {
-  return (
-    <>
-      {/* ── Google Fonts ────────────────────────────────────── */}
-      {/* eslint-disable-next-line @next/next/no-head-element */}
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600&display=swap');
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-        html { scroll-behavior: smooth; }
-        body { background: #0D1B2A; }
-        a { color: inherit; }
-        button { font-family: 'DM Sans', system-ui, sans-serif; }
-        .nav-link:hover { color: #fff !important; }
-        .demo-btn:hover { border-color: #0D9488 !important; color: #5EEAD4 !important; }
-        .btn-primary:hover { background: #14B8A6 !important; }
-        .btn-outline:hover { border-color: #0D9488 !important; color: #5EEAD4 !important; }
-        @media (max-width: 860px) {
-          .hero-grid { grid-template-columns: 1fr !important; }
-          .phases-grid { grid-template-columns: 1fr !important; }
-          .features-grid { grid-template-columns: 1fr 1fr !important; }
-          .hide-mobile { display: none !important; }
-        }
-        @media (max-width: 600px) {
-          .features-grid { grid-template-columns: 1fr !important; }
-          .container-pad { padding: 0 20px !important; }
-        }
-      `}</style>
-
-      <div style={S.page}>
-
-        {/* ══ NAV ══════════════════════════════════════════════════════════ */}
-        <nav style={S.nav}>
-          <div style={S.navLogo}>
-            <LogoMark />
-            <span style={S.logoText}>AcctOS</span>
-          </div>
-          <div className="hide-mobile" style={S.navLinks}>
-            <a href="#phases" className="nav-link" style={S.navLink}>Features</a>
-            <a href="#compare" className="nav-link" style={S.navLink}>Compare</a>
-            <a href="#pricing" className="nav-link" style={S.navLink}>Pricing</a>
-          </div>
-          <a href="/login">
-            <button style={S.navCta}>Sign in →</button>
-          </a>
-        </nav>
-
-        {/* ══ HERO ═════════════════════════════════════════════════════════ */}
-        <div className="container-pad" style={{ maxWidth: 1200, margin: "0 auto", padding: "80px 40px 60px" }}>
-          <div className="hero-grid" style={{ display: "grid", gridTemplateColumns: "1fr 440px", gap: 60, alignItems: "center" }}>
-            {/* Left */}
-            <div>
-              <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "rgba(13,148,136,0.15)", border: "1px solid rgba(13,148,136,0.35)", borderRadius: 20, padding: "5px 14px", fontSize: 12, color: "#5EEAD4", fontWeight: 600, marginBottom: 22, letterSpacing: ".04em" }}>
-                <div style={{ width: 7, height: 7, background: "#14B8A6", borderRadius: "50%" }} />
-                Phases 0–4 Production Ready
-              </div>
-              <h1 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: "clamp(36px, 5vw, 52px)", lineHeight: 1.08, fontWeight: 900, marginBottom: 20 }}>
-                We Don&apos;t Track Work.<br />
-                <span style={{ color: "#14B8A6" }}>We Predict Risk.</span>
-              </h1>
-              <p style={{ color: "#94A3B8", fontSize: 16, lineHeight: 1.7, maxWidth: 480, marginBottom: 32 }}>
-                The workflow intelligence platform built specifically for Canadian accounting firms. CRA deadlines native. 5-condition risk engine. Gate enforcement that prevents errors before they become penalties.
-              </p>
-              <div style={{ display: "flex", gap: 32 }}>
-                {[["6", "Workflow templates"], ["5", "Risk conditions"], ["14", "DB migrations"], ["98%", "Infra margin"]].map(([num, label]) => (
-                  <div key={label} style={{ borderLeft: "2px solid #0D9488", paddingLeft: 14 }}>
-                    <div style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: 26, fontWeight: 700 }}>{num}</div>
-                    <div style={{ fontSize: 11, color: "#94A3B8", fontWeight: 500, textTransform: "uppercase", letterSpacing: ".06em" }}>{label}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Login card */}
-            <div style={{ background: "#112236", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 16, padding: 32, flexShrink: 0 }}>
-              <div style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: 22, fontWeight: 700, marginBottom: 4 }}>Welcome back</div>
-              <div style={{ color: "#94A3B8", fontSize: 13, marginBottom: 24 }}>Sign in to Jensen &amp; Associates CPA</div>
-              <div style={{ marginBottom: 16 }}>
-                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#94A3B8", marginBottom: 6, textTransform: "uppercase", letterSpacing: ".05em" }}>Work email</label>
-                <input
-                  type="email"
-                  placeholder="patrick@jensenaccounting.ca"
-                  style={{ width: "100%", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 8, padding: "10px 14px", color: "#fff", fontFamily: "inherit", fontSize: 14, outline: "none" }}
-                />
-              </div>
-              <div style={{ marginBottom: 8 }}>
-                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#94A3B8", marginBottom: 6, textTransform: "uppercase", letterSpacing: ".05em" }}>Password</label>
-                <input
-                  type="password"
-                  placeholder="••••••••••"
-                  style={{ width: "100%", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 8, padding: "10px 14px", color: "#fff", fontFamily: "inherit", fontSize: 14, outline: "none" }}
-                />
-              </div>
-              <a href="/login">
-                <button className="btn-primary" style={{ width: "100%", background: "#0D9488", border: "none", borderRadius: 8, padding: 12, color: "#fff", fontFamily: "inherit", fontSize: 14, fontWeight: 600, cursor: "pointer", marginTop: 8, transition: "background .2s" }}>
-                  Sign in to AcctOS
-                </button>
-              </a>
-              <div style={{ textAlign: "center", color: "#94A3B8", fontSize: 12, margin: "16px 0", position: "relative" }}>
-                <span style={{ background: "#112236", padding: "0 10px", position: "relative", zIndex: 1 }}>or</span>
-                <div style={{ position: "absolute", left: 0, right: 0, top: "50%", height: 1, background: "rgba(255,255,255,0.1)" }} />
-              </div>
-              <button className="demo-btn" style={{ width: "100%", background: "transparent", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 8, padding: 11, color: "#94A3B8", fontFamily: "inherit", fontSize: 13, fontWeight: 500, cursor: "pointer", transition: "all .2s" }}>
-                Request a 30-minute demo
-              </button>
-              <div style={{ textAlign: "center", fontSize: 11, color: "#64748B", marginTop: 14 }}>
-                No account? <a href="/signup" style={{ color: "#5EEAD4", textDecoration: "none" }}>Start your free 60-day pilot →</a>
-              </div>
-            </div>
-          </div>
+    <div style={S.page}>
+      {/* NAV */}
+      <nav style={S.nav}>
+        <div style={{display:"flex",alignItems:"center"}}>
+          <div style={S.logoMark}>A</div>
+          <span style={S.logoText}>AcctOS</span>
         </div>
+        <ul style={S.navLinks}>
+          <li><a href="#phases" style={S.navLink}>Features</a></li>
+          <li><a href="#pricing" style={S.navLink}>Pricing</a></li>
+          <li><a href="#compare" style={S.navLink}>Compare</a></li>
+        </ul>
+        <a href="/login"><button style={S.navCta}>Sign in →</button></a>
+      </nav>
 
-        {/* ══ PHASES ═══════════════════════════════════════════════════════ */}
-        <div id="phases" style={{ background: "#112236", borderTop: "1px solid rgba(255,255,255,0.06)", borderBottom: "1px solid rgba(255,255,255,0.06)", padding: "72px 0" }}>
-          <div className="container-pad" style={{ maxWidth: 1200, margin: "0 auto", padding: "0 40px" }}>
-            <div style={{ fontSize: 11, fontWeight: 600, color: "#14B8A6", letterSpacing: ".1em", textTransform: "uppercase", marginBottom: 12 }}>Four phases. One platform.</div>
-            <h2 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: "clamp(28px, 4vw, 38px)", fontWeight: 700, lineHeight: 1.15, marginBottom: 14 }}>
-              Everything a Canadian accounting firm needs
-            </h2>
-            <p style={{ color: "#94A3B8", fontSize: 15, lineHeight: 1.7, maxWidth: 580, marginBottom: 48 }}>
-              Built phase by phase so complexity only arrives when users demand it. All four phases are production-ready today.
-            </p>
-            {/* Interactive phase tabs — client component */}
-            <PhaseTabs />
+      {/* HERO */}
+      <div style={S.hero}>
+        <div>
+          <div style={S.badge}>
+            <div style={S.badgeDot}/>
+            Phases 0–4 Production Ready · acct-os.vercel.app
           </div>
-        </div>
-
-        {/* ══ FEATURES GRID ════════════════════════════════════════════════ */}
-        <div className="container-pad" style={{ maxWidth: 1200, margin: "0 auto", padding: "72px 40px" }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: "#14B8A6", letterSpacing: ".1em", textTransform: "uppercase", marginBottom: 12 }}>Built for Canada</div>
-          <h2 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: "clamp(28px, 4vw, 38px)", fontWeight: 700, lineHeight: 1.15, marginBottom: 48 }}>
-            Every rule the CRA expects,<br />built into the engine
-          </h2>
-          <div className="features-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 20 }}>
-            <FeatCard icon="📅" title="CRA deadlines native" desc="Monthly, quarterly, and annual CRA deadlines built in. Ontario timezone. Monthly filers: last day of following month. Quarterly: last day of month after quarter-end." />
-            <FeatCard icon="🔒" title="Gate enforcement" desc="Stage 3 cannot begin until all documents are received. Filing is blocked until review is approved. Hard stops with specific reasons — database-level prevention, not just visual warnings." />
-            <FeatCard icon="⚡" title="5-condition risk engine" desc="C1 timeline breach · C2 deadline proximity · C3 document blocker · C4 stage stall · C5 risk history. Evaluated per workflow. Status computed dynamically — never stored, never stale." />
-            <FeatCard icon="🏢" title="Corp vs sole prop branching" desc="Corporation: ITC reconciliation added to Stage 3. Dual review gate if GST > $10,000. Sole proprietor: simplified checklist, revenue threshold check, no ITCs required." />
-            <FeatCard icon="📧" title="Automated escalation" desc="Document requests go out automatically. Day 3: Reminder #1. Day 6: Reminder #2 + owner escalation. Deadline < 5 days: urgent alert. Full email log per client, per filing." />
-            <FeatCard icon="🛡️" title="Row Level Security" desc="Every database query scoped to firm_id at the Postgres level via Supabase RLS. A bug in application code cannot leak data between firms. PIPEDA-compliant. Data in ca-central-1." />
-          </div>
-        </div>
-
-        {/* ══ COMPARISON ═══════════════════════════════════════════════════ */}
-        <div id="compare" className="container-pad" style={{ maxWidth: 1200, margin: "0 auto", padding: "0 40px 72px" }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: "#14B8A6", letterSpacing: ".1em", textTransform: "uppercase", marginBottom: 12 }}>Why AcctOS</div>
-          <h2 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: "clamp(28px, 4vw, 38px)", fontWeight: 700, lineHeight: 1.15, marginBottom: 32 }}>
-            Built for Canada. Not adapted.
-          </h2>
-          <div style={{ background: "#112236", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14, overflow: "hidden" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr>
-                  {["Feature", "Uku", "TaxDome", "AcctOS"].map((h, i) => (
-                    <th key={h} style={{ padding: "14px 20px", textAlign: i === 0 ? "left" : "center", fontSize: 12, fontWeight: 600, color: i === 3 ? "#fff" : "#94A3B8", background: i === 3 ? "rgba(13,148,136,0.12)" : "rgba(255,255,255,0.04)", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {COMP_ROWS.map(([feat, uku, taxdome], i) => (
-                  <tr key={feat} style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-                    <td style={{ padding: "12px 20px", fontSize: 13, color: "#fff", fontWeight: 500 }}>{feat}</td>
-                    <td style={{ padding: "12px 20px", fontSize: 13, color: "#64748B", textAlign: "center" }}>{uku}</td>
-                    <td style={{ padding: "12px 20px", fontSize: 13, color: "#64748B", textAlign: "center" }}>{taxdome}</td>
-                    <td style={{ padding: "12px 20px", fontSize: 13, color: "#22C55E", fontWeight: 600, textAlign: "center", background: "rgba(13,148,136,0.06)" }}>✓ Yes</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* ══ PRICING ══════════════════════════════════════════════════════ */}
-        <div id="pricing" className="container-pad" style={{ maxWidth: 1200, margin: "0 auto", padding: "0 40px 72px" }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: "#14B8A6", letterSpacing: ".1em", textTransform: "uppercase", marginBottom: 12 }}>Pricing</div>
-          <h2 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: "clamp(28px, 4vw, 38px)", fontWeight: 700, lineHeight: 1.15, marginBottom: 14 }}>
-            Flat CAD. Per firm. No per-user nonsense.
-          </h2>
-          <p style={{ color: "#94A3B8", fontSize: 15, lineHeight: 1.7, maxWidth: 520, marginBottom: 40 }}>
-            One avoided CRA penalty covers roughly a month of the Growth plan. That&apos;s the math.
+          <h1 style={S.h1}>
+            We Don&apos;t Track Work.<br/>
+            <span style={S.h1accent}>We Predict Risk.</span>
+          </h1>
+          <p style={S.heroSub}>
+            The workflow intelligence platform built for Canadian accounting firms.
+            CRA deadlines native. 5-condition At Risk engine. Gate enforcement that
+            catches errors before they become CRA penalties.
           </p>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 20 }}>
-            {[
-              { name: "Starter", price: "$49", clients: "50 clients", users: "2 users", rec: false },
-              { name: "Growth", price: "$149", clients: "150 clients", users: "5 users", rec: true },
-              { name: "Scale", price: "$299", clients: "Unlimited", users: "Unlimited", rec: false },
-            ].map(plan => (
-              <div key={plan.name} style={{ background: plan.rec ? "rgba(13,148,136,0.1)" : "#112236", border: plan.rec ? "2px solid rgba(13,148,136,0.5)" : "1px solid rgba(255,255,255,0.08)", borderRadius: 14, padding: 26 }}>
-                {plan.rec && <div style={{ display: "inline-block", background: "rgba(13,148,136,0.2)", color: "#5EEAD4", fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 10, marginBottom: 12, letterSpacing: ".04em" }}>★ Recommended</div>}
-                <div style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: 20, fontWeight: 700, marginBottom: 8, color: "#fff" }}>{plan.name}</div>
-                <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginBottom: 16 }}>
-                  <span style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: 40, fontWeight: 700, color: plan.rec ? "#14B8A6" : "#fff" }}>{plan.price}</span>
-                  <span style={{ fontSize: 13, color: "#94A3B8" }}>/mo CAD</span>
-                </div>
-                <div style={{ fontSize: 13, color: "#94A3B8", marginBottom: 4 }}>{plan.clients}</div>
-                <div style={{ fontSize: 13, color: "#94A3B8", marginBottom: 20 }}>{plan.users}</div>
-                <a href="/signup">
-                  <button className="btn-primary" style={{ width: "100%", background: plan.rec ? "#0D9488" : "transparent", border: plan.rec ? "none" : "1px solid rgba(255,255,255,0.15)", borderRadius: 8, padding: "11px 0", color: "#fff", fontFamily: "inherit", fontSize: 13, fontWeight: 600, cursor: "pointer", transition: "background .2s" }}>
-                    {plan.rec ? "Start free pilot →" : "Get started"}
-                  </button>
-                </a>
+          <div style={S.statsRow}>
+            {[["42","API routes"],["24","DB tables"],["5","Risk conditions"],["$0","Infra to start"]].map(([n,l],i)=>(
+              <div key={i}>
+                <div style={S.statNum}>{n}</div>
+                <div style={S.statLabel}>{l}</div>
               </div>
             ))}
           </div>
         </div>
 
-        {/* ══ CTA ══════════════════════════════════════════════════════════ */}
-        <div className="container-pad" style={{ maxWidth: 1200, margin: "0 auto", padding: "0 40px 72px" }}>
-          <div style={{ background: "linear-gradient(135deg, rgba(13,148,136,.15), rgba(20,184,166,.08))", border: "1px solid rgba(13,148,136,.25)", borderRadius: 20, padding: "56px 40px", textAlign: "center" }}>
-            <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "rgba(13,148,136,0.15)", border: "1px solid rgba(13,148,136,0.3)", borderRadius: 20, padding: "5px 14px", fontSize: 12, color: "#5EEAD4", fontWeight: 600, marginBottom: 20, letterSpacing: ".04em" }}>
-              Phases 0–4 production-ready
-            </div>
-            <h2 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: "clamp(28px, 4vw, 38px)", fontWeight: 700, marginBottom: 14, lineHeight: 1.2 }}>
-              The product is built.<br />Let&apos;s get your firm live.
-            </h2>
-            <p style={{ color: "#94A3B8", fontSize: 15, marginBottom: 32 }}>
-              60-day pilot, no credit card. Your real clients, your workflows, your deadlines. Live in an afternoon.
-            </p>
-            <div style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap", marginBottom: 24 }}>
-              <a href="/signup">
-                <button className="btn-primary" style={{ background: "#0D9488", border: "none", padding: "13px 28px", borderRadius: 10, color: "#fff", fontFamily: "inherit", fontSize: 14, fontWeight: 600, cursor: "pointer", transition: "background .2s" }}>
-                  Start free 60-day pilot →
-                </button>
-              </a>
-              <a href="/demo">
-                <button className="btn-outline" style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.15)", padding: "12px 28px", borderRadius: 10, color: "#fff", fontFamily: "inherit", fontSize: 14, fontWeight: 500, cursor: "pointer", transition: "all .2s" }}>
-                  Book a 30-minute demo
-                </button>
-              </a>
-            </div>
-            <div style={{ display: "flex", justifyContent: "center", gap: 32, flexWrap: "wrap" }}>
-              {["No credit card required", "Canadian data residency (ca-central-1)", "PIPEDA compliant", "Cancel any time"].map(t => (
-                <div key={t} style={{ fontSize: 12, color: "#64748B" }}>✓ {t}</div>
-              ))}
-            </div>
+        {/* LOGIN CARD */}
+        <div style={S.loginCard}>
+          <div style={S.loginTitle}>Welcome back</div>
+          <div style={S.loginSub}>Sign in to your firm</div>
+          <div style={{marginBottom:16}}>
+            <label style={S.label}>Work email</label>
+            <input style={S.input} type="email" placeholder="you@yourfirm.ca" readOnly/>
+          </div>
+          <div>
+            <label style={S.label}>Password</label>
+            <input style={S.input} type="password" placeholder="••••••••••" readOnly/>
+          </div>
+          <a href="/login"><button style={S.loginBtn}>Sign in to AcctOS →</button></a>
+          <div style={S.divider}>or</div>
+          <button style={S.demoBtn}>Request a 30-minute demo</button>
+          <div style={S.loginNote}>
+            One prevented CRA penalty covers a month of Growth plan.
           </div>
         </div>
-
-        {/* ══ FOOTER ═══════════════════════════════════════════════════════ */}
-        <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-          <div className="container-pad" style={{ maxWidth: 1200, margin: "0 auto", padding: "28px 40px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 16 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <div style={{ width: 26, height: 26, background: "#0D9488", borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontFamily: "Georgia, serif", fontWeight: 700, color: "#fff" }}>A</div>
-              <span style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: 15, fontWeight: 700, color: "#fff" }}>AcctOS</span>
-              <span style={{ fontSize: 11, color: "#64748B", marginLeft: 8 }}>Canadian Accounting Operations</span>
-            </div>
-            <div style={{ display: "flex", gap: 20 }}>
-              {["Privacy", "Terms", "Security", "API Docs"].map(link => (
-                <a key={link} href={`/${link.toLowerCase().replace(" ", "-")}`} style={{ fontSize: 12, color: "#64748B", textDecoration: "none" }}>{link}</a>
-              ))}
-            </div>
-            <div style={{ fontSize: 11, color: "#64748B" }}>© 2025 AcctOS · Vercel + Supabase · Ontario, Canada</div>
-          </div>
-        </div>
-
       </div>
-    </>
+
+      <div style={S.dividerLine}/>
+
+      {/* PHASES */}
+      <div style={S.section} id="phases">
+        <div style={S.sectionLbl}>Four phases. One platform.</div>
+        <h2 style={S.sectionH2}>Everything a Canadian firm needs</h2>
+        <p style={S.sectionSub}>Built phase by phase — complexity only arrives when your firm demands it.</p>
+        <PhaseTabs />
+      </div>
+
+      <div style={S.dividerLine}/>
+
+      {/* PRICING */}
+      <div style={S.section} id="pricing">
+        <div style={S.sectionLbl}>Pricing</div>
+        <h2 style={S.sectionH2}>Flat CAD firm pricing. No per-user fees.</h2>
+        <p style={S.sectionSub}>A 5-person firm on AcctOS Growth saves $350+/month vs TaxDome Pro. One avoided CRA penalty covers the Growth plan for a month.</p>
+        <div style={S.pricingGrid}>
+          {[
+            {
+              name:"Starter", price:"$49", annual:"$39/mo billed annually ($468/yr)",
+              highlight:false,
+              feats:["Up to 10 clients","GST/HST workflows","CRA deadline tracking","At Risk engine","Document collection","Email reminders"],
+            },
+            {
+              name:"Growth", price:"$149", annual:"$119/mo billed annually ($1,428/yr)",
+              highlight:true,
+              feats:["Up to 50 clients","All workflow templates","T1, T2, Payroll, Bookkeeping","QBO + Zoho integration","Client portal","Time tracking + invoicing"],
+            },
+            {
+              name:"Scale", price:"$299", annual:"$239/mo billed annually ($2,868/yr)",
+              highlight:false,
+              feats:["Unlimited clients","Everything in Growth","Priority support","Custom automation rules","Advanced reporting","Early access to AI features"],
+            },
+          ].map((plan,i)=>(
+            <div key={i} style={plan.highlight ? S.planCardH : S.planCard}>
+              {plan.highlight && <div style={{fontSize:11,fontWeight:700,color:"#38BDF8",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:8}}>Most Popular</div>}
+              <div style={S.planName}>{plan.name}</div>
+              <div style={S.planPrice}>{plan.price}<span style={{fontSize:16,fontWeight:400,color:"#475569"}}>/mo</span></div>
+              <div style={S.planPer}>per firm · CAD · no per-user fees</div>
+              <div style={S.planAnnual}>↓ {plan.annual}</div>
+              <div style={S.planFeats}>
+                {plan.feats.map((f,j)=>(
+                  <div key={j} style={S.planFeat}>
+                    <span style={{color:"#2563EB",flexShrink:0}}>✓</span>
+                    {f}
+                  </div>
+                ))}
+              </div>
+              <button style={plan.highlight ? S.planBtnH : S.planBtn}>
+                {plan.highlight ? "Start free pilot →" : "Get started"}
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div style={S.dividerLine}/>
+
+      {/* COMPARE */}
+      <div style={S.section} id="compare">
+        <div style={S.sectionLbl}>Comparison</div>
+        <h2 style={S.sectionH2}>AcctOS vs Uku vs TaxDome</h2>
+        <p style={S.sectionSub}>Both competitors charge per user in USD. AcctOS is flat CAD per firm.</p>
+        <div style={{border:"1px solid #1E293B",borderRadius:12,overflow:"hidden"}}>
+          <table style={S.table}>
+            <thead>
+              <tr>
+                <th style={S.th}>Feature</th>
+                <th style={S.th}>Uku</th>
+                <th style={S.th}>TaxDome</th>
+                <th style={S.thUs}>AcctOS</th>
+              </tr>
+            </thead>
+            <tbody>
+              {COMPARE.map((row,i)=>(
+                <tr key={i} style={{background: i%2===0 ? "transparent" : "#0A0E18"}}>
+                  <td style={S.tdFeat}>{row.feature}</td>
+                  <td style={S.td}>{row.uku}</td>
+                  <td style={S.td}>{row.tax}</td>
+                  <td style={S.tdUs}>{row.us}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div style={S.dividerLine}/>
+
+      {/* CTA */}
+      <div style={S.ctaSection}>
+        <div style={{fontSize:12,fontWeight:700,color:"#2563EB",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:16}}>Free pilot</div>
+        <h2 style={{fontSize:36,fontWeight:800,color:"#F1F5F9",margin:"0 0 16px",letterSpacing:"-0.02em"}}>The product is built. Let&apos;s get your firm live.</h2>
+        <p style={{fontSize:15,color:"#64748B",margin:"0 0 36px",maxWidth:520,marginLeft:"auto",marginRight:"auto"}}>
+          60-day free pilot. Your real clients. Your real deadlines. Cancel anytime.
+          Most firms are fully set up in under an afternoon.
+        </p>
+        <div style={{display:"flex",gap:16,justifyContent:"center"}}>
+          <a href="/login"><button style={{...S.navCta,padding:"14px 32px",fontSize:15}}>Start free pilot →</button></a>
+          <button style={{padding:"14px 32px",fontSize:15,background:"transparent",color:"#94A3B8",border:"1px solid #1E293B",borderRadius:8,cursor:"pointer"}}>Book a demo</button>
+        </div>
+        <div style={{marginTop:32,display:"flex",gap:32,justifyContent:"center",fontSize:12,color:"#334155"}}>
+          {["No credit card required","Canadian data residency","Cancel anytime","Setup in an afternoon"].map((t,i)=>(
+            <span key={i}>✓ {t}</span>
+          ))}
+        </div>
+      </div>
+
+      {/* FOOTER */}
+      <footer style={S.footer}>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <div style={S.logoMark}>A</div>
+          <span style={{fontSize:14,color:"#475569"}}>AcctOS · Built for Canadian accounting firms</span>
+        </div>
+        <div style={{fontSize:12,color:"#334155"}}>
+          © 2026 AcctOS · acct-os.vercel.app
+        </div>
+      </footer>
+    </div>
   );
 }
