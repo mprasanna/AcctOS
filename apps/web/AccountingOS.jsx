@@ -403,7 +403,7 @@ function AddClientModal({ onClose, onSaved }) {
   const [newClientId, setNewClientId] = useState(null);
 
   const [form, setForm] = useState({
-    name:"", type:"Corporation", freq:"Monthly", city:"", since: new Date().getFullYear().toString(), bn:"", net_gst:"", client_email:"", client_phone:"",
+    name:"", type:"Corporation", freq:"Monthly", city:"", since: new Date().getFullYear().toString(), bn:"", net_gst:"",
   });
   const [wfForm, setWfForm] = useState({
     type:"GST/HST", period:"", deadline:"", cycle_start:"",
@@ -498,8 +498,6 @@ function AddClientModal({ onClose, onSaved }) {
             </div>
             {inp("CRA Business Number (BN)","bn",form,setF,"text",null,"bn")}
             {inp("Net GST Amount (optional)","net_gst",form,setF,"number",null,"net_gst")}
-          {inp("Client Email (for direct reminders)","client_email",form,setF,"email",null,null)}
-          {inp("Client Phone (optional)","client_phone",form,setF,"tel",null,null)}
             <div style={{ display:"flex", justifyContent:"flex-end", gap:8, marginTop:6 }}>
               <Btn onClick={onClose}>Cancel</Btn>
               <button onClick={saveClient} disabled={saving}
@@ -573,7 +571,7 @@ function Dashboard({ clients, onSelect, setView, onAddClient }) {
 
   return (
     <div>
-      <SectionHead title="Command Centre" sub={`${new Date().toLocaleDateString("en-CA",{month:"long",year:"numeric"})} · ${cnt.all} active clients · Ontario (CRA timezone)`}
+      <SectionHead title="Command Centre" sub={`${new Date().toLocaleDateString("en-CA",{month:"long",year:"numeric"})} · ${cnt.all} active clients · Canada (CRA)`}
         action={<>
           <button onClick={onAddClient}
             style={{ background:C.green, color:"white", border:"none", borderRadius:8, padding:"7px 14px", fontSize:13, fontWeight:600, cursor:"pointer" }}>
@@ -1198,10 +1196,6 @@ function DocumentsTab({ wf, client, onRefresh }) {
 
   async function markReceived(doc) {
     if (!doc.id) return;
-    if (doc.upload_required && !doc.storage_path) {
-      alert("This document requires a file upload before it can be marked received. Use the Upload button.");
-      return;
-    }
     setSaving(doc.id);
     try {
       const res = await fetch(`/api/documents/${doc.id}`, {
@@ -1209,15 +1203,12 @@ function DocumentsTab({ wf, client, onRefresh }) {
         headers:{"Content-Type":"application/json"},
         body: JSON.stringify({ status:"received", upload_source:"Manual" }),
       });
-      const data = await res.json();
       if (res.ok) {
         setDocs(prev => prev.map(d => d.id === doc.id
           ? {...d, status:"received", uploaded_at: new Date().toLocaleDateString("en-CA",{month:"short",day:"numeric"}), upload_source:"Manual"}
           : d
         ));
         if (onRefresh) onRefresh();
-      } else if (res.status === 409) {
-        alert(data.error || "Upload required before marking received.");
       }
     } finally { setSaving(null); }
   }
@@ -1588,15 +1579,13 @@ function IntegrationTab({ clientId }) {
 // ─── EDIT CLIENT MODAL ────────────────────────────────────────────────────────
 function EditClientModal({ client, onClose, onSaved }) {
   const [form, setForm] = useState({
-    name:         client.name         || "",
-    type:         client.type         || "Corporation",
-    freq:         client.freq         || "Monthly",
-    city:         client.city         || "",
-    since:        client.since        || "",
-    bn:           client.bn           || "",
-    net_gst:      client.netGst       || client.net_gst || "",
-    client_email: client.client_email || "",
-    client_phone: client.client_phone || "",
+    name:    client.name    || "",
+    type:    client.type    || "Corporation",
+    freq:    client.freq    || "Monthly",
+    city:    client.city    || "",
+    since:   client.since   || "",
+    bn:      client.bn      || "",
+    net_gst: client.netGst  || client.net_gst || "",
   });
   const [saving, setSaving]   = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -1662,8 +1651,6 @@ function EditClientModal({ client, onClose, onSaved }) {
           </div>
           {inp("CRA Business Number","bn")}
           {inp("Net GST Amount","net_gst","number")}
-          {inp("Client Email","client_email","email")}
-          {inp("Client Phone","client_phone","tel")}
         </div>
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
           {!confirmDelete
@@ -2372,12 +2359,12 @@ function SettingsPage() {
   const [activeTab, setActiveTab] = useState("firm");
 
   // ── Firm profile state ───────────────────────────────────────────────────────
-  const [firm, setFirm]       = useState({ name:"", email:"", province:"Ontario", bn:"" });
+  const [firm, setFirm]       = useState({ name:"", email:"", province:"", bn:"" });
   const [firmSaving, setFirmSaving] = useState(false);
   const [firmMsg, setFirmMsg] = useState(null);
 
   // ── Automation rules state ───────────────────────────────────────────────────
-  const [rules, setRules]       = useState({ auto_create_workflows:true, doc_reminder_day3:true, escalate_on_reminder2:true, deadline_alert_3d:true, overdue_flag:true, require_upload_to_receive:false, doc_reminder_send_to_client:false });
+  const [rules, setRules]       = useState({ auto_create_workflows:true, doc_reminder_day3:true, escalate_on_reminder2:true, deadline_alert_3d:true, overdue_flag:true });
   const [rulesSaving, setRulesSaving] = useState(false);
   const [rulesMsg, setRulesMsg] = useState(null);
 
@@ -2513,7 +2500,7 @@ function SettingsPage() {
             {[
               ["Firm Name","name","text"],
               ["Primary Email","email","email"],
-              ["Province","province","text"],
+              ["Province","province","text", ["Alberta","British Columbia","Manitoba","New Brunswick","Newfoundland and Labrador","Nova Scotia","Ontario","Prince Edward Island","Quebec","Saskatchewan","Northwest Territories","Nunavut","Yukon"]],
               ["CRA Business Number","bn","text"],
             ].map(([label,key,type]) => (
               <div key={key}>
@@ -2618,8 +2605,6 @@ function SettingsPage() {
               ["escalate_on_reminder2",  "Escalate to owner on Reminder #2",                    "When Reminder #2 is sent, the firm owner is CC'd automatically."],
               ["deadline_alert_3d",      "Deadline alert 3 days before CRA due date",           "Assigned accountant is notified 3 days before the CRA deadline if workflow is not Complete."],
               ["overdue_flag",           "Flag overdue clients on dashboard",                   "Clients past their CRA deadline with an incomplete workflow are flagged Overdue."],
-              ["require_upload_to_receive", "Require file upload before marking document received", "Accountants cannot mark a document as received unless a file has been uploaded. Manual 'Mark Received' is disabled. Enforced server-side."],
-              ["doc_reminder_send_to_client", "Send document reminders directly to client",    "When on: reminder emails go to the client's email address (set on the client profile). When off: reminders go to the assigned accountant."],
             ].map(([key, label, desc]) => (
               <div key={key} style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:16 }}>
                 <div style={{ flex:1 }}>
