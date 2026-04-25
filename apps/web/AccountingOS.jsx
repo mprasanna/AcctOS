@@ -1750,6 +1750,7 @@ function ClientWorkspace({ client: initialClient, onBack, onRefresh }) {
   };
 
   return (
+    <>
     <div>
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14 }}>
         <button onClick={onBack} style={{ background:"none", border:"none", color:C.primary, cursor:"pointer", fontSize:13, fontWeight:500, padding:0 }}>← Back</button>
@@ -1859,6 +1860,7 @@ function ClientWorkspace({ client: initialClient, onBack, onRefresh }) {
         onSaved={() => { setShowEdit(false); handleRefresh(); }}
       />
     )}
+    </>
   );
 }
 
