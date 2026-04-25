@@ -174,6 +174,14 @@ export async function POST(req: NextRequest) {
       }))
     )
 
+    // Load firm settings for upload_required flag
+    const { data: fSettings } = await supabase
+      .from('firm_settings')
+      .select('require_upload_to_receive')
+      .eq('firm_id', userRow.firm_id)
+      .single()
+    const requireUpload = fSettings?.require_upload_to_receive ?? false
+
     // Documents
     if (resolved.docs.length > 0) {
       await supabase.from('documents').insert(
@@ -184,6 +192,8 @@ export async function POST(req: NextRequest) {
           name:           d.name,
           status:         'pending' as const,
           reminder_count: 0,
+          is_t183:        d.is_t183 ?? false,
+          upload_required: requireUpload ? true : (d.is_t183 ?? false),
         }))
       )
     }

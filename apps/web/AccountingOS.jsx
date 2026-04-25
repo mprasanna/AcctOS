@@ -1404,6 +1404,10 @@ function DocumentsTab({ wf, client, onRefresh }) {
 
   async function markReceived(doc) {
     if (!doc.id) return;
+    if (doc.upload_required && !doc.storage_path) {
+      alert("A file upload is required before this document can be marked received.");
+      return;
+    }
     setSaving(doc.id);
     try {
       const res = await fetch(`/api/documents/${doc.id}`, {
@@ -1479,7 +1483,11 @@ function DocumentsTab({ wf, client, onRefresh }) {
               <div key={doc.id || i} style={{ padding:"10px 16px", borderBottom:i<docs.length-1?`1px solid ${C.border}`:"none" }}>
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
                   <div style={{ flex:1 }}>
-                    <div style={{ fontSize:13, color:C.text, fontWeight:500 }}>{doc.name}</div>
+                    <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                      <div style={{ fontSize:13, color:C.text, fontWeight:500 }}>{doc.name}</div>
+                      {doc.is_t183 && <span style={{ fontSize:10, fontWeight:700, background:"#DBEAFE", color:"#1D4ED8", borderRadius:4, padding:"1px 6px" }}>T183</span>}
+                      {doc.upload_required && doc.status!=="received" && <span style={{ fontSize:10, fontWeight:700, background:"#FEF3C7", color:"#B45309", borderRadius:4, padding:"1px 6px" }}>Upload required</span>}
+                    </div>
                     <div style={{ fontSize:11, color:C.muted, marginTop:1 }}>
                       {doc.status==="received"
                         ? `✓ Received ${doc.uploaded_at||doc.uploadedAt||""}${doc.upload_source||doc.by?" · "+(doc.upload_source||doc.by):""}`

@@ -193,29 +193,37 @@ export async function createPortalSession(params: {
 // ────────────────────────────────────────────────────────────
 
 export async function createFilingInvoice(params: {
-  customerId:     string
-  firmId:         string
-  clientName:     string
-  workflowLabel:  string
-  period:         string
-  amountCents:    number   // e.g. 19900 = $199 CAD filing fee
-  dueDate?:       Date
+  stripeCustomerId: string
+  amountCents:      number
+  currency?:        string
+  description?:     string
+  metadata?:        Record<string, string>
+  // Legacy fields (still accepted for compatibility)
+  customerId?:      string
+  firmId?:          string
+  clientName?:      string
+  workflowLabel?:   string
+  period?:          string
+  dueDate?:         Date
 }): Promise<{ invoiceId: string | null; error: string | null }> {
   const stripe = getStripe()
+  const customerId = params.stripeCustomerId || params.customerId || ''
+  const desc = params.description
+    || (params.workflowLabel ? `${params.workflowLabel} — ${params.clientName ?? ''} · ${params.period ?? ''}` : 'Filing fee')
 
   try {
     // Create invoice item
     await stripe.invoiceItems.create({
-      customer:    params.customerId,
+      customer:    customerId,
       amount:      params.amountCents,
-      currency:    'cad',
-      description: `${params.workflowLabel} — ${params.clientName} · ${params.period}`,
-      metadata:    { firm_id: params.firmId },
+      currency:    params.currency ?? 'cad',
+      description: desc,
+      metadata:    params.metadata ?? (params.firmId ? { firm_id: params.firmId } : {}),
     })
 
     // Create and finalize the invoice
     const invoice = await stripe.invoices.create({
-      customer:         params.customerId,
+      customer:         customerId,
       collection_method: 'send_invoice',
       days_until_due:   params.dueDate
         ? Math.ceil((params.dueDate.getTime() - Date.now()) / 86_400_000)

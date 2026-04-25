@@ -66,11 +66,12 @@ export async function POST(req: NextRequest) {
   }
 
   // Get or create Stripe customer for this firm
-  const stripeCustomerId = await getOrCreateStripeCustomer({
-    firmId:     userRow.firm_id,
-    firmName:   firm?.name ?? 'Accounting Firm',
-    email:      (wf.client as any)?.client_email ?? undefined,
-  })
+  const { customerId: stripeCustomerId, error: custError } = await getOrCreateStripeCustomer(
+    userRow.firm_id,
+    firm?.name ?? 'Accounting Firm',
+    (wf.client as any)?.client_email ?? ''
+  )
+  if (custError) return NextResponse.json({ error: custError, code: 'STRIPE_ERROR' }, { status: 500 })
 
   const invoiceDescription = description ?? `${wf.type} — ${wf.label} — ${(wf.client as any)?.name}`
 

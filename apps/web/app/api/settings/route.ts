@@ -85,6 +85,8 @@ export async function PATCH(req: NextRequest) {
     'dual_review_threshold',
     'require_upload_to_receive',
     'doc_reminder_send_to_client',
+    'invoice_on_completion',
+    'billing_rates',
   ]
 
   const firmPatch: Record<string, unknown>     = {}
