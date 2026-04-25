@@ -1901,6 +1901,7 @@ export default function App() {
   );
 
   return (
+    <>
     <div style={{ display:"flex", minHeight:"100vh", background:C.bg, fontFamily:"'Inter', system-ui, sans-serif" }}>
       <div style={{ width:210, background:C.card, borderRight:`1px solid ${C.border}`, display:"flex", flexDirection:"column", position:"sticky", top:0, height:"100vh", flexShrink:0 }}>
         <div style={{ padding:"16px 16px 12px", borderBottom:`1px solid ${C.border}` }}>
@@ -1965,5 +1966,6 @@ export default function App() {
         onSaved={() => { setShowAddClient(false); onRefresh(); }}
       />
     )}
+    </>
   );
 }
