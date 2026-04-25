@@ -611,6 +611,47 @@ function getStageActor(stageN, client) {
   return actors[stageN] || { action: "Advance stage", role: "Accountant", who: "KS / JR" };
 }
 
+
+// ─── TOOLTIP ─────────────────────────────────────────────────────────────────
+function Tooltip({ text }) {
+  const [show, setShow] = useState(false);
+  return (
+    <span style={{ position:"relative", display:"inline-flex", alignItems:"center" }}>
+      <span
+        onMouseEnter={() => setShow(true)}
+        onMouseLeave={() => setShow(false)}
+        style={{ width:15, height:15, borderRadius:"50%", background:C.primaryBg, color:C.primary, fontSize:9, fontWeight:700, display:"inline-flex", alignItems:"center", justifyContent:"center", cursor:"help", marginLeft:5, flexShrink:0 }}
+      >i</span>
+      {show && (
+        <span style={{ position:"absolute", left:20, top:-4, background:"#1E293B", color:"white", fontSize:11, lineHeight:1.5, padding:"6px 10px", borderRadius:7, width:220, zIndex:999, pointerEvents:"none", whiteSpace:"pre-wrap", boxShadow:"0 4px 16px rgba(0,0,0,0.2)" }}>
+          {text}
+        </span>
+      )}
+    </span>
+  );
+}
+
+// ─── FIELD HELP CONTENT ───────────────────────────────────────────────────────
+const FIELD_HELP = {
+  // Client fields
+  client_name:  "Full legal name of the business or individual. For corporations, use the registered name. For sole proprietors, use the business operating name.",
+  entity_type:  "Corporation: incorporated business (Inc., Ltd., Corp.)\nSole prop: unincorporated individual business\nPartnership: two or more people in business together",
+  filing_freq:  "Monthly: large businesses (>$1.5M annual taxable supplies)\nQuarterly: medium businesses ($1.5M–$6M)\nAnnual: small businesses (<$1.5M)",
+  city:         "City and province where the business operates. Used for CRA timezone and deadline calculations.",
+  client_since: "Year you started working with this client. Helps track relationship history.",
+  bn:           "Canada Revenue Agency Business Number. Format: 123456789 RT0001. The RT0001 suffix identifies the GST/HST account. Leave blank if unknown.",
+  net_gst:      "Expected net GST/HST amount for this filing period. Used to determine if dual review is required (>$10,000 triggers mandatory second sign-off).",
+  // Workflow fields
+  wf_type_gst:  "GST/HST: 6-stage CRA filing workflow. Auto-generates bookkeeping, document collection, preparation, review, filing, and confirmation stages.",
+  wf_type_t2:   "T2: Corporate income tax return. Annual filing, typically 6 months after fiscal year end.",
+  wf_type_t1:   "T1: Personal income tax return. Annual, due April 30 (or June 15 for self-employed).",
+  wf_type_payroll: "Payroll Remittances: monthly or bi-weekly CRA payroll deduction remittances. Penalty-sensitive — late remittances compound quickly.",
+  wf_type_bookkeeping: "Monthly Bookkeeping: reconciliation and review cycle. Can be linked to auto-advance GST Stage 1 when complete.",
+  period:       "Human-readable label for this filing period. Examples: 'October 2026', 'Q3 2026 (Jul–Sep)', 'FY 2026', 'Apr 2026'",
+  cycle_start:  "First day of the period being filed. Used by the At Risk engine to calculate Day 12 timeline breach (C1 condition).",
+  deadline:     "CRA filing deadline for this period.\nGST Monthly: last day of following month\nGST Quarterly: last day of month after quarter-end\nT2: 6 months after fiscal year-end\nPayroll: 15th of following month",
+};
+
 // ─── ADD CLIENT MODAL ────────────────────────────────────────────────────────
 const WF_TYPES = ["GST/HST","T2","T1","Payroll","Bookkeeping"];
 const CLIENT_TYPES = ["Corporation","Sole prop","Partnership"];
@@ -667,9 +708,12 @@ function AddClientModal({ onClose, onSaved }) {
     finally{ setSaving(false); }
   }
 
-  const inp = (label, key, formObj, setFn, type="text", opts=null) => (
+  const inp = (label, key, formObj, setFn, type="text", opts=null, helpKey=null) => (
     <div key={key}>
-      <label style={{ display:"block", fontSize:11, fontWeight:600, color:C.muted, marginBottom:4, textTransform:"uppercase", letterSpacing:"0.05em" }}>{label}</label>
+      <label style={{ display:"flex", alignItems:"center", fontSize:11, fontWeight:600, color:C.muted, marginBottom:4, textTransform:"uppercase", letterSpacing:"0.05em" }}>
+        {label}
+        {helpKey && FIELD_HELP[helpKey] && <Tooltip text={FIELD_HELP[helpKey]} />}
+      </label>
       {opts
         ? <select value={formObj[key]} onChange={e=>setFn(key,e.target.value)}
             style={{ width:"100%", padding:"8px 10px", borderRadius:8, border:`1px solid ${C.border}`, fontSize:13, outline:"none", background:"white" }}>
@@ -704,17 +748,17 @@ function AddClientModal({ onClose, onSaved }) {
 
         {step===1 && (
           <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
-            {inp("Client / Business Name","name",form,setF)}
+            {inp("Client / Business Name","name",form,setF,"text",null,"client_name")}
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
-              {inp("Entity Type","type",form,setF,"text",CLIENT_TYPES)}
-              {inp("Filing Frequency","freq",form,setF,"text",FREQ_OPTIONS)}
+              {inp("Entity Type","type",form,setF,"text",CLIENT_TYPES,"entity_type")}
+              {inp("Filing Frequency","freq",form,setF,"text",FREQ_OPTIONS,"filing_freq")}
             </div>
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
-              {inp("City","city",form,setF)}
-              {inp("Client Since (year)","since",form,setF)}
+              {inp("City","city",form,setF,"text",null,"city")}
+              {inp("Client Since (year)","since",form,setF,"text",null,"client_since")}
             </div>
-            {inp("CRA Business Number (BN)","bn",form,setF)}
-            {inp("Net GST Amount (optional)","net_gst",form,setF,"number")}
+            {inp("CRA Business Number (BN)","bn",form,setF,"text",null,"bn")}
+            {inp("Net GST Amount (optional)","net_gst",form,setF,"number",null,"net_gst")}
             <div style={{ display:"flex", justifyContent:"flex-end", gap:8, marginTop:6 }}>
               <Btn onClick={onClose}>Cancel</Btn>
               <button onClick={saveClient} disabled={saving}
@@ -730,14 +774,17 @@ function AddClientModal({ onClose, onSaved }) {
             <div style={{ background:C.greenBg, border:"1px solid #BBF7D0", borderRadius:8, padding:"8px 12px", fontSize:12, color:"#14532D" }}>
               ✓ Client created. Now add their first workflow — stages and tasks will be created automatically from the template.
             </div>
-            {inp("Workflow Type","type",wfForm,setW,"text",WF_TYPES)}
-            {inp("Period Label","period",wfForm,setW,"text")}
+            {inp("Workflow Type","type",wfForm,setW,"text",WF_TYPES,"wf_type_gst")}
+            {inp("Period Label","period",wfForm,setW,"text",null,"period")}
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
-              {inp("Cycle Start","cycle_start",wfForm,setW,"date")}
-              {inp("CRA Deadline","deadline",wfForm,setW,"date")}
+              {inp("Cycle Start","cycle_start",wfForm,setW,"date",null,"cycle_start")}
+              {inp("CRA Deadline","deadline",wfForm,setW,"date",null,"deadline")}
             </div>
             <div style={{ background:"#F0F9FF", border:"1px solid #BAE6FD", borderRadius:8, padding:"8px 12px", fontSize:11, color:"#0369A1" }}>
               💡 Stages, tasks, and document checklist will be auto-generated from the {wfForm.type} template for a {form.type}.
+              {FIELD_HELP[`wf_type_${wfForm.type.toLowerCase().replace("/","").replace(" ","_")}`] &&
+                <div style={{ marginTop:5, color:"#0369A1" }}>{FIELD_HELP[`wf_type_${wfForm.type.toLowerCase().replace("/","").replace(" ","_")}`]}</div>
+              }
             </div>
             <div style={{ display:"flex", justifyContent:"space-between", gap:8, marginTop:6 }}>
               <Btn onClick={() => { onSaved(); onClose(); }}>Skip workflow for now</Btn>
@@ -1223,31 +1270,71 @@ function TasksTab({ wf, onRefresh }) {
 
 // ─── DOCUMENTS TAB (wired to DB) ─────────────────────────────────────────────
 function DocumentsTab({ wf, client, onRefresh }) {
-  const [docs, setDocs] = useState(wf.docs || wf.documents || []);
-  const [saving, setSaving] = useState(null);
-  const [emailLog, setEmailLog] = useState(client.emailLog || []);
+  const [docs, setDocs]             = useState(wf.docs || wf.documents || []);
+  const [saving, setSaving]         = useState(null);
+  const [uploading, setUploading]   = useState(null); // doc.id being uploaded
+  const [showSendModal, setShowSendModal] = useState(false);
+  const [emailLog, setEmailLog]     = useState([]);
+  const [sendResult, setSendResult] = useState(null); // {sent, error}
 
   const wfId = wf.id;
   const [lastId, setLastId] = useState(wfId);
   if (wfId !== lastId) { setDocs(wf.docs || wf.documents || []); setLastId(wfId); }
+
+  // Fetch email log for this workflow
+  useEffect(() => {
+    if (!wf.id) return;
+    fetch(`/api/clients/${client.id}/events?limit=20`, { credentials:"include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(json => {
+        if (json?.data) {
+          const emailEvents = json.data.filter(e => e.action?.includes('sent') || e.action?.includes('Reminder'));
+          setEmailLog(emailEvents);
+        }
+      }).catch(()=>{});
+  }, [wf.id, client.id]);
 
   async function markReceived(doc) {
     if (!doc.id) return;
     setSaving(doc.id);
     try {
       const res = await fetch(`/api/documents/${doc.id}`, {
-        method: "PATCH", credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "received", upload_source: "Manual" }),
+        method:"PATCH", credentials:"include",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ status:"received", upload_source:"Manual" }),
       });
       if (res.ok) {
-        setDocs(prev => prev.map(d => d.id === doc.id ? {...d, status:"received", uploaded_at: new Date().toLocaleDateString("en-CA",{month:"short",day:"numeric"})} : d));
+        setDocs(prev => prev.map(d => d.id === doc.id
+          ? {...d, status:"received", uploaded_at: new Date().toLocaleDateString("en-CA",{month:"short",day:"numeric"}), upload_source:"Manual"}
+          : d
+        ));
         if (onRefresh) onRefresh();
       }
     } finally { setSaving(null); }
   }
 
-  const pendingCount = docs.filter(d => d.status === "pending").length;
+  async function uploadFile(doc, file) {
+    if (!doc.id || !file) return;
+    setUploading(doc.id);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("document_id", doc.id);
+      formData.append("workflow_id", wf.id);
+      formData.append("client_id", client.id);
+      const res = await fetch("/api/upload", { method:"POST", credentials:"include", body: formData });
+      if (res.ok) {
+        setDocs(prev => prev.map(d => d.id === doc.id
+          ? {...d, status:"received", uploaded_at: new Date().toLocaleDateString("en-CA",{month:"short",day:"numeric"}), upload_source:"Firm upload"}
+          : d
+        ));
+        if (onRefresh) onRefresh();
+      }
+    } finally { setUploading(null); }
+  }
+
+  const pendingDocs  = docs.filter(d => d.status === "pending");
+  const pendingCount = pendingDocs.length;
 
   return (
     <div>
@@ -1255,53 +1342,179 @@ function DocumentsTab({ wf, client, onRefresh }) {
         <div style={{ fontSize:13, fontWeight:600, color:C.text }}>Document Checklist — {wf.label}</div>
         <div style={{ display:"flex", gap:8, alignItems:"center" }}>
           {pendingCount > 0 && <Pill label={`${pendingCount} pending`} bg={C.amberBg} color={C.amber} />}
-          <Btn variant="primary">+ Send Request</Btn>
+          {pendingCount > 0 && wf.id && (
+            <button onClick={() => setShowSendModal(true)}
+              style={{ background:C.primary, color:"white", border:"none", borderRadius:8, padding:"6px 14px", fontSize:12, fontWeight:600, cursor:"pointer" }}>
+              + Send Request
+            </button>
+          )}
         </div>
       </div>
+
       <div style={{ background:"#F0F9FF", border:"1px solid #BAE6FD", borderRadius:8, padding:"10px 14px", marginBottom:14, fontSize:12, color:"#0369A1" }}>
         {client.type==="Corporation"
           ? "🔒 Corporation checklist: bank statements, AR/AP aging, invoices, receipts >$500, ITC reconciliation"
           : "🔒 Sole prop checklist: bank statements, all sales invoices, receipts >$100, GST registration (new clients)"}
       </div>
+
+      {sendResult && (
+        <div style={{ background:sendResult.sent?C.greenBg:C.redBg, border:`1px solid ${sendResult.sent?"#BBF7D0":"#FCA5A5"}`, borderRadius:8, padding:"9px 14px", marginBottom:12, fontSize:13, color:sendResult.sent?"#14532D":C.red }}>
+          {sendResult.sent ? "✓ Reminder email sent successfully." : `⚠ Email failed: ${sendResult.error}`}
+        </div>
+      )}
+
       {!docs.length
         ? <div style={{ background:C.amberBg, border:`1px solid #FCD34D`, borderRadius:8, padding:"16px", fontSize:12, color:C.amber }}>⚠ No documents loaded from database for this workflow.</div>
         : (
           <Card>
             {docs.map((doc, i) => (
-              <div key={doc.id || i} style={{ padding:"10px 16px", borderBottom:i<docs.length-1?`1px solid ${C.border}`:"none", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                <div>
-                  <div style={{ fontSize:13, color:C.text }}>{doc.name}</div>
-                  <div style={{ fontSize:11, color:C.muted, marginTop:1 }}>
-                    {doc.status==="received"
-                      ? `Uploaded ${doc.uploaded_at||doc.uploadedAt||"—"}${doc.upload_source||doc.by?" · "+(doc.upload_source||doc.by):""}`
-                      : `Reminder #${doc.reminder_count??doc.reminderCount??0} sent ${doc.last_reminder_at||doc.lastReminderAt||"—"}`}
-                    {!doc.id && <span style={{ color:C.amber, marginLeft:6 }}>⚠ no DB id</span>}
+              <div key={doc.id || i} style={{ padding:"10px 16px", borderBottom:i<docs.length-1?`1px solid ${C.border}`:"none" }}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontSize:13, color:C.text, fontWeight:500 }}>{doc.name}</div>
+                    <div style={{ fontSize:11, color:C.muted, marginTop:1 }}>
+                      {doc.status==="received"
+                        ? `✓ Received ${doc.uploaded_at||doc.uploadedAt||""}${doc.upload_source||doc.by?" · "+(doc.upload_source||doc.by):""}`
+                        : `Reminder #${doc.reminder_count??doc.reminderCount??0}${doc.last_reminder_at||doc.lastReminderAt?" · Last sent "+(doc.last_reminder_at||doc.lastReminderAt):""}`}
+                    </div>
                   </div>
-                </div>
-                <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                  {doc.status==="pending" && doc.id && (
-                    <button onClick={() => markReceived(doc)} disabled={saving===doc.id}
-                      style={{ fontSize:11, color:C.green, background:C.greenBg, border:`1px solid #BBF7D0`, borderRadius:6, padding:"3px 10px", cursor:"pointer" }}>
-                      {saving===doc.id ? "…" : "Mark Received"}
-                    </button>
-                  )}
-                  <Pill label={doc.status==="received"?"Received":"Pending"} bg={doc.status==="received"?C.greenBg:C.amberBg} color={doc.status==="received"?C.green:C.amber} />
+                  <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                    {doc.status==="pending" && doc.id && (
+                      <>
+                        {/* File upload */}
+                        <label style={{ fontSize:11, color:C.primary, background:C.primaryBg, border:`1px solid #BFDBFE`, borderRadius:6, padding:"3px 10px", cursor:"pointer" }}>
+                          {uploading===doc.id ? "…" : "↑ Upload"}
+                          <input type="file" style={{ display:"none" }} onChange={e => e.target.files?.[0] && uploadFile(doc, e.target.files[0])} />
+                        </label>
+                        {/* Mark received manually */}
+                        <button onClick={() => markReceived(doc)} disabled={saving===doc.id}
+                          style={{ fontSize:11, color:C.green, background:C.greenBg, border:`1px solid #BBF7D0`, borderRadius:6, padding:"3px 10px", cursor:"pointer" }}>
+                          {saving===doc.id ? "…" : "Mark Received"}
+                        </button>
+                      </>
+                    )}
+                    <Pill label={doc.status==="received"?"Received":"Pending"} bg={doc.status==="received"?C.greenBg:C.amberBg} color={doc.status==="received"?C.green:C.amber} />
+                  </div>
                 </div>
               </div>
             ))}
           </Card>
         )
       }
+
       {emailLog.length > 0 && (
-        <div style={{ marginTop:14, background:C.amberBg, border:"1px solid #FCD34D", borderRadius:8, padding:"12px 16px" }}>
-          <div style={{ fontSize:12, fontWeight:600, color:C.amber, marginBottom:8 }}>Email Escalation Log</div>
-          {emailLog.map((e, i) => (
-            <div key={i} style={{ fontSize:12, color:"#92400E", marginBottom:4, display:"flex", gap:8 }}>
-              <span style={{ color:C.green }}>✓</span>{e.type||e} — Sent {e.date||""}
+        <div style={{ marginTop:14, background:"#F8FAFC", border:`1px solid ${C.border}`, borderRadius:8, padding:"12px 16px" }}>
+          <div style={{ fontSize:12, fontWeight:600, color:C.muted, marginBottom:8 }}>Email Log</div>
+          {emailLog.slice(0,5).map((e, i) => (
+            <div key={i} style={{ fontSize:12, color:C.text, marginBottom:4, display:"flex", gap:8 }}>
+              <span style={{ color:C.green }}>✓</span>
+              <span>{e.action}</span>
+              <span style={{ color:C.muted, marginLeft:"auto" }}>{e.created_at ? new Date(e.created_at).toLocaleDateString("en-CA",{month:"short",day:"numeric"}) : ""}</span>
             </div>
           ))}
         </div>
       )}
+
+      {/* ── Send Request Modal ── */}
+      {showSendModal && (
+        <SendRequestModal
+          wf={wf}
+          client={client}
+          pendingDocs={pendingDocs}
+          onClose={() => setShowSendModal(false)}
+          onSent={(result) => { setSendResult(result); setShowSendModal(false); if (onRefresh) onRefresh(); }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── SEND REQUEST MODAL ───────────────────────────────────────────────────────
+function SendRequestModal({ wf, client, pendingDocs, onClose, onSent }) {
+  const maxReminders  = Math.max(...pendingDocs.map(d => d.reminder_count ?? 0), 0);
+  const reminderNum   = maxReminders + 1;
+  const isEscalation  = reminderNum >= 2;
+  const [sending, setSending] = useState(false);
+  const [error, setError]     = useState(null);
+
+  // Preview the email that will be sent
+  const deadlineStr = wf.deadline ? new Date(wf.deadline).toLocaleDateString("en-CA",{weekday:"long",year:"numeric",month:"long",day:"numeric"}) : "—";
+  const daysLeft    = wf.deadline ? Math.ceil((new Date(wf.deadline) - new Date()) / 86400000) : null;
+
+  async function send() {
+    setSending(true); setError(null);
+    try {
+      const res = await fetch("/api/documents/request", {
+        method:"POST", credentials:"include",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({
+          workflow_id:  wf.id,
+          document_ids: pendingDocs.map(d => d.id).filter(Boolean),
+          type:         `Reminder #${reminderNum}`,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok || res.status === 207) {
+        onSent({ sent: !data.error, error: data.error });
+      } else {
+        setError(data.error || "Failed to send.");
+      }
+    } catch(e) { setError("Network error."); }
+    finally { setSending(false); }
+  }
+
+  return (
+    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.4)", zIndex:200, display:"flex", alignItems:"center", justifyContent:"center" }}>
+      <div style={{ background:"white", borderRadius:14, padding:"28px 32px", width:520, maxHeight:"85vh", overflowY:"auto", boxShadow:"0 20px 60px rgba(0,0,0,0.2)" }}>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
+          <div>
+            <div style={{ fontSize:15, fontWeight:700, color:C.text }}>Send Document Request</div>
+            <div style={{ fontSize:12, color:C.muted, marginTop:2 }}>{wf.label} · {client.name}</div>
+          </div>
+          <button onClick={onClose} style={{ background:"none", border:"none", fontSize:20, color:C.muted, cursor:"pointer" }}>×</button>
+        </div>
+
+        {isEscalation && (
+          <div style={{ background:C.amberBg, border:"1px solid #FCD34D", borderRadius:8, padding:"8px 12px", marginBottom:14, fontSize:12, color:"#92400E" }}>
+            ⚑ This is Reminder #{reminderNum} — firm owner will be CC'd on this escalation.
+          </div>
+        )}
+
+        {/* Email preview */}
+        <div style={{ background:"#F8FAFC", border:`1px solid ${C.border}`, borderRadius:8, padding:"14px 16px", marginBottom:16 }}>
+          <div style={{ fontSize:11, fontWeight:600, color:C.muted, textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:10 }}>Email Preview</div>
+          <div style={{ fontSize:13, color:C.text, marginBottom:6 }}>
+            <strong>To:</strong> Assigned accountant → forwards to {client.name}
+          </div>
+          <div style={{ fontSize:13, color:C.text, marginBottom:6 }}>
+            <strong>Subject:</strong> {isEscalation ? "[Action Required] " : ""}Documents needed — {wf.label}
+          </div>
+          <div style={{ fontSize:13, color:C.text, marginBottom:10 }}>
+            <strong>Deadline:</strong> {deadlineStr}{daysLeft !== null ? ` (${daysLeft > 0 ? daysLeft+"d remaining" : "overdue"})` : ""}
+          </div>
+          <div style={{ fontSize:12, color:C.muted, marginBottom:6 }}>Documents requested:</div>
+          {pendingDocs.map((d,i) => (
+            <div key={i} style={{ fontSize:12, color:C.text, padding:"3px 0", display:"flex", gap:6 }}>
+              <span style={{ color:C.amber }}>○</span>{d.name}
+            </div>
+          ))}
+          {isEscalation && (
+            <div style={{ marginTop:10, fontSize:12, color:"#991B1B", background:"#FFF1F2", borderRadius:6, padding:"6px 10px" }}>
+              This is the second request. If not received, the return may be filed late — CRA penalties may apply.
+            </div>
+          )}
+        </div>
+
+        {error && <div style={{ background:C.redBg, border:"1px solid #FCA5A5", borderRadius:8, padding:"8px 12px", fontSize:12, color:C.red, marginBottom:12 }}>{error}</div>}
+
+        <div style={{ display:"flex", justifyContent:"flex-end", gap:8 }}>
+          <Btn onClick={onClose}>Cancel</Btn>
+          <button onClick={send} disabled={sending}
+            style={{ background:isEscalation?C.amber:C.primary, color:"white", border:"none", borderRadius:8, padding:"8px 18px", fontSize:13, fontWeight:600, cursor:sending?"not-allowed":"pointer", opacity:sending?0.7:1 }}>
+            {sending ? "Sending…" : `Send Reminder #${reminderNum} →`}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
