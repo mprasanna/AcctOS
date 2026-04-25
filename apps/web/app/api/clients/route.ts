@@ -34,7 +34,9 @@ export async function GET(req: NextRequest) {
         workflows (
           *,
           stages ( * ),
-          documents ( id, status, reminder_count )
+          tasks ( id, title, status, stage_n, due_date, sort_order, assigned_to,
+                  assigned_user:users!tasks_assigned_to_fkey ( id, name, initials ) ),
+          documents ( id, name, status, reminder_count, last_reminder_at, uploaded_at, upload_source )
         )
       `)
 
