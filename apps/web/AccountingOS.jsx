@@ -17,267 +17,6 @@ function daysFrom(a, b) { return Math.floor((new Date(b) - new Date(a)) / 864000
 function fmtDate(d) { return new Date(d).toLocaleDateString("en-CA", { month: "short", day: "numeric" }); }
 function fmtLong(d) { return new Date(d).toLocaleDateString("en-CA", { month: "long", day: "numeric", year: "numeric" }); }
 
-// ─── USERS ────────────────────────────────────────────────────────────────────
-const USERS = {
-  u_pw: { name: "Patrick W.",  initials: "PW", role: "Owner / Senior CPA" },
-  u_ks: { name: "Kiera S.",    initials: "KS", role: "Senior Accountant" },
-  u_jr: { name: "James R.",    initials: "JR", role: "Accountant" },
-  u_rh: { name: "Reece H.",    initials: "RH", role: "Admin" },
-};
-
-// ─── RAW CLIENT DATA ──────────────────────────────────────────────────────────
-// taskInProgressDays lives on each WORKFLOW now (not on client) — fixes C4 scope
-const RAW_CLIENTS = [
-  {
-    id: "c_maple",
-    name: "Maple Contracting Ltd.",
-    type: "Corporation", initials: "MC", freq: "Monthly",
-    city: "Ottawa, ON", since: "2022", bn: "81427 3910 RT0001",
-    assigned: "u_ks", netGst: 4820, riskHistory: false, penaltyRisk: null,
-    workflows: [
-      {
-        id: "wf_maple_gst_oct", type: "GST/HST", label: "GST/HST — October 2025",
-        period: "Oct 2025", deadline: new Date("2025-10-31"), cycleStart: new Date("2025-10-01"),
-        curStage: 3, taskInProgressDays: 2,
-        stageNotes: { 1: "Reconciled in QBO — Oct 2", 2: "All docs received — Oct 5", 3: "Draft in progress — Oct 6" },
-        stages: [
-          { n:1, name:"Bookkeeping",         status:"complete",    date:"Oct 2",  gate:"bookkeepingStatus = complete",              gateLabel:"Bookkeeping confirmed in QBO" },
-          { n:2, name:"Document Collection", status:"complete",    date:"Oct 5",  gate:"allDocsReceived = true",                    gateLabel:"All required documents received" },
-          { n:3, name:"Preparation",         status:"in_progress", date:"Oct 6",  gate:"stage2Complete = true",                     gateLabel:"Corporation → ITC reconciliation required" },
-          { n:4, name:"Review",              status:"pending",                    gate:"preparationComplete = true",                gateLabel:"GST $4,820 — single review sufficient" },
-          { n:5, name:"Filing",              status:"pending",                    gate:"reviewApproved = true",                     gateLabel:"Review approval required before filing" },
-          { n:6, name:"Confirmation",        status:"pending",                    gate:"filingComplete = true",                     gateLabel:"Record CRA confirmation number" },
-        ],
-        tasks: [
-          { title:"Reconcile QBO through period end",         who:"KS", due:"Oct 1",  status:"complete" },
-          { title:"Confirm bank feeds match",                  who:"KS", due:"Oct 1",  status:"complete" },
-          { title:"Flag any unclassified transactions",        who:"PW", due:"Oct 2",  status:"complete" },
-          { title:"Request required documents",                who:"RH", due:"Oct 3",  status:"complete" },
-          { title:"Confirm ITC reconciliation (Corporation)",  who:"KS", due:"Oct 8",  status:"complete" },
-          { title:"Calculate GST and prepare draft return",    who:"KS", due:"Oct 10", status:"in_progress" },
-          { title:"Senior review and sign-off",                who:"PW", due:"Oct 15", status:"pending" },
-          { title:"Submit return to CRA",                      who:"KS", due:"Oct 31", status:"pending" },
-          { title:"Record CRA confirmation number",            who:"KS", due:"Oct 31", status:"pending" },
-        ],
-        docs: [
-          { name:"Bank_Statement_Oct25.pdf",   status:"received", reminderCount:0, uploadedAt:"Oct 5", by:"Client upload" },
-          { name:"Vendor_Invoices_Oct25.zip",  status:"received", reminderCount:0, uploadedAt:"Oct 5", by:"Client upload" },
-          { name:"Expense_Receipts_Oct25.pdf", status:"received", reminderCount:0, uploadedAt:"Oct 5", by:"Client upload" },
-          { name:"QBO_Export_Oct25.csv",       status:"received", reminderCount:0, uploadedAt:"Oct 2", by:"Auto-sync" },
-        ],
-      },
-      {
-        id:"wf_maple_t2", type:"T2", label:"Corporate Year-End 2025",
-        period:"FY 2025", deadline:new Date("2026-03-31"), cycleStart:new Date("2026-01-01"),
-        curStage:1, taskInProgressDays:0, stages:[], tasks:[], docs:[],
-      },
-      {
-        id:"wf_maple_payroll", type:"Payroll", label:"Payroll Remittance — Oct",
-        period:"Oct 2025", deadline:new Date("2025-11-15"), cycleStart:new Date("2025-10-01"),
-        curStage:2, taskInProgressDays:0, stages:[], tasks:[], docs:[],
-      },
-    ],
-    activity: [
-      { t:"Oct 6 10:14", who:"Kiera S.",  act:"Started Stage 3 — Preparation",   detail:"Draft return underway" },
-      { t:"Oct 5 14:02", who:"Reece H.",  act:"Marked documents complete",        detail:"4 of 4 received" },
-      { t:"Oct 2 09:11", who:"System",    act:"Bookkeeping auto-verified",        detail:"QBO reconciled through Sep 30" },
-      { t:"Oct 1 07:00", who:"System",    act:"Workflow auto-generated",          detail:"GST/HST October 2025" },
-    ],
-    emailLog: [],
-  },
-  {
-    id: "c_sunrise",
-    name: "Sunrise Bakery Inc.",
-    type: "Corporation", initials: "SB", freq: "Monthly",
-    city: "Ottawa, ON", since: "2021", bn: "72841 6603 RT0001",
-    assigned: "u_jr", netGst: null, riskHistory: false, penaltyRisk: null,
-    workflows: [
-      {
-        id:"wf_sunrise_gst_oct", type:"GST/HST", label:"GST/HST — October 2025",
-        period:"Oct 2025", deadline:new Date("2025-10-31"), cycleStart:new Date("2025-10-01"),
-        curStage:2, taskInProgressDays:0,
-        stageNotes: { 1:"Confirmed — Oct 2", 2:"Reminder #2 sent Oct 9, no response" },
-        stages: [
-          { n:1, name:"Bookkeeping",         status:"complete",  date:"Oct 2",                    gate:"bookkeepingStatus = complete",   gateLabel:"Bookkeeping confirmed in QBO" },
-          { n:2, name:"Document Collection", status:"blocked",   date:"Reminder #2 sent Oct 9",   gate:"allDocsReceived = false",        gateLabel:"3 documents still pending — Stage 3 is blocked until all docs received", blocked:true, blockReason:"Client has not responded to Reminder #2 (sent Oct 9). Stage 3 cannot begin until bank statement, invoices, and receipts are received." },
-          { n:3, name:"Preparation",         status:"pending",                                    gate:"stage2Complete = true",          gateLabel:"Waiting on document gate", blocked:true, blockReason:"Blocked by Stage 2. Cannot prepare return until all documents are on file." },
-          { n:4, name:"Review",              status:"pending",                                    gate:"preparationComplete = true",     gateLabel:"Blocked by Stage 2", blocked:true, blockReason:"Blocked upstream — resolve document collection first." },
-          { n:5, name:"Filing",              status:"pending",                                    gate:"reviewApproved = true",          gateLabel:"Blocked by Stage 2", blocked:true, blockReason:"Blocked upstream — resolve document collection first." },
-          { n:6, name:"Confirmation",        status:"pending",                                    gate:"filingComplete = true",          gateLabel:"Record CRA confirmation number" },
-        ],
-        tasks: [
-          { title:"Reconcile QBO through period end",              who:"JR",  due:"Oct 1", status:"complete" },
-          { title:"Request required documents",                    who:"RH",  due:"Oct 3", status:"in_progress" },
-          { title:"Automated Reminder #1",                         who:"Bot", due:"Oct 3", status:"complete" },
-          { title:"Automated Reminder #2 — escalate to owner",    who:"Bot", due:"Oct 6", status:"complete" },
-          { title:"Calculate GST and prepare draft return",        who:"JR",  due:"Oct 10",status:"blocked" },
-          { title:"Senior review and sign-off",                    who:"PW",  due:"Oct 15",status:"blocked" },
-          { title:"Submit return to CRA",                          who:"JR",  due:"Oct 31",status:"blocked" },
-          { title:"Record CRA confirmation number",                who:"JR",  due:"Oct 31",status:"blocked" },
-        ],
-        docs: [
-          { name:"Bank Statement — October",  status:"pending", reminderCount:2, lastReminderAt:"Oct 9", uploadedAt:null },
-          { name:"Outstanding Invoices",      status:"pending", reminderCount:2, lastReminderAt:"Oct 9", uploadedAt:null },
-          { name:"Expense Receipts >$500",    status:"pending", reminderCount:2, lastReminderAt:"Oct 9", uploadedAt:null },
-        ],
-      },
-    ],
-    activity: [
-      { t:"Oct 9 08:00", who:"System",    act:"Reminder #2 sent — owner notified",  detail:"Document blocker escalated to Patrick W." },
-      { t:"Oct 6 08:00", who:"System",    act:"Reminder #1 sent to client",         detail:"No response after 3 days" },
-      { t:"Oct 3 07:00", who:"Reece H.",  act:"Initial document request sent",      detail:"3 items requested" },
-      { t:"Oct 1 07:00", who:"System",    act:"Workflow auto-generated",            detail:"GST/HST October 2025" },
-    ],
-    emailLog: [
-      { type:"Initial Request",           date:"Oct 3", status:"sent" },
-      { type:"Reminder #1",               date:"Oct 6", status:"sent" },
-      { type:"Reminder #2 — Escalation",  date:"Oct 9", status:"sent" },
-    ],
-  },
-  {
-    id: "c_patel",
-    name: "Patel & Sons Holdings",
-    type: "Corporation", initials: "PS", freq: "Quarterly",
-    city: "Mississauga, ON", since: "2019", bn: "55301 2214 RT0001",
-    assigned: "u_ks", netGst: 14800, riskHistory: true, penaltyRisk: "HIGH",
-    workflows: [
-      {
-        id:"wf_patel_gst_q2", type:"GST/HST", label:"GST/HST — Q2 2025",
-        period:"Q2 2025 (Apr–Jun)", deadline:new Date("2025-07-31"), cycleStart:new Date("2025-07-01"),
-        curStage:5, taskInProgressDays:0,
-        stageNotes: { 1:"Complete", 2:"Complete", 3:"Complete", 4:"Dual review — both approved (GST > $10k)", 5:"MISSED — accountant was away" },
-        stages: [
-          { n:1, name:"Bookkeeping",         status:"complete",  gate:"bookkeepingStatus = complete",  gateLabel:"Bookkeeping confirmed in QBO" },
-          { n:2, name:"Document Collection", status:"complete",  gate:"allDocsReceived = true",        gateLabel:"All docs received" },
-          { n:3, name:"Preparation",         status:"complete",  gate:"stage2Complete = true",         gateLabel:"ITC reconciliation complete" },
-          { n:4, name:"Review",              status:"complete",  gate:"preparationComplete = true",    gateLabel:"GST $14,800 > $10,000 → dual review required ✓" },
-          { n:5, name:"Filing",              status:"missed",    date:"Missed Jul 31",                 gate:"reviewApproved = true",         gateLabel:"Gate passed — filing missed due to accountant absence", missed:true, blockReason:"CRA deadline passed Jul 31. Late filing required immediately. Interest and penalties accumulating. File today — log reason in CRA correspondence." },
-          { n:6, name:"Confirmation",        status:"pending",   gate:"filingComplete = true",         gateLabel:"Record CRA confirmation after late filing" },
-        ],
-        tasks: [
-          { title:"Reconcile QBO through period end",              who:"KS", due:"Jul 1",  status:"complete" },
-          { title:"Confirm ITC reconciliation (Corporation)",      who:"KS", due:"Jul 5",  status:"complete" },
-          { title:"Confirm all Q2 docs received",                  who:"RH", due:"Jul 3",  status:"complete" },
-          { title:"Calculate GST and prepare draft return",        who:"KS", due:"Jul 10", status:"complete" },
-          { title:"Accountant review and sign-off",                who:"KS", due:"Jul 13", status:"complete" },
-          { title:"Senior review — GST > $10,000 dual approval",  who:"PW", due:"Jul 15", status:"complete" },
-          { title:"Submit return to CRA",                          who:"KS", due:"Jul 31", status:"missed" },
-          { title:"Record CRA confirmation number",                who:"KS", due:"Jul 31", status:"pending" },
-        ],
-        docs: [
-          { name:"Bank Statement — Q2", status:"received", reminderCount:0, uploadedAt:"Jul 5" },
-          { name:"Invoices — April",    status:"received", reminderCount:0, uploadedAt:"Jul 5" },
-          { name:"Invoices — May",      status:"received", reminderCount:0, uploadedAt:"Jul 5" },
-          { name:"Invoices — June",     status:"received", reminderCount:0, uploadedAt:"Jul 6" },
-        ],
-      },
-    ],
-    activity: [
-      { t:"Oct 14 09:00", who:"System",     act:"Overdue flag raised",                 detail:"75 days past CRA deadline — penalty risk HIGH" },
-      { t:"Jul 31 17:00", who:"System",     act:"Filing deadline passed — not filed",  detail:"KS was away, no backup coverage" },
-      { t:"Jul 15 11:22", who:"Patrick W.", act:"Dual review approved",               detail:"GST $14,800 — both reviews complete" },
-      { t:"Jul 10 14:00", who:"Kiera S.",   act:"Draft return prepared",              detail:"Net GST: $14,800" },
-    ],
-    emailLog: [],
-  },
-  {
-    id:"c_rivr",
-    name:"Riviera Auto Body",
-    type:"Sole prop", initials:"RA", freq:"Quarterly",
-    city:"Cornwall, ON", since:"2019", bn:"90412 1120",
-    assigned:"u_jr", netGst:3240, riskHistory:false, penaltyRisk:null,
-    workflows: [
-      {
-        id:"wf_rivr_gst_q3", type:"GST/HST", label:"GST/HST — Q3 2025",
-        period:"Q3 2025", deadline:new Date("2025-10-31"), cycleStart:new Date("2025-10-01"),
-        curStage:3, taskInProgressDays:0,
-        stages: [
-          { n:1, name:"Bookkeeping",         status:"complete",    gate:"bookkeepingStatus = complete",  gateLabel:"Bookkeeping confirmed" },
-          { n:2, name:"Document Collection", status:"complete",    gate:"allDocsReceived = true",        gateLabel:"All docs received" },
-          { n:3, name:"Preparation",         status:"in_progress", gate:"stage2Complete = true",         gateLabel:"Sole prop → simplified checklist (no ITCs); revenue threshold check" },
-          { n:4, name:"Review",              status:"pending",     gate:"preparationComplete = true",    gateLabel:"Single review — sole proprietor" },
-          { n:5, name:"Filing",              status:"pending",     gate:"reviewApproved = true",         gateLabel:"Review approval required" },
-          { n:6, name:"Confirmation",        status:"pending",     gate:"filingComplete = true",         gateLabel:"Record CRA confirmation" },
-        ],
-        tasks: [
-          { title:"Reconcile QBO through Q3",                        who:"JR", due:"Oct 3",  status:"complete" },
-          { title:"Request simplified doc checklist",                 who:"RH", due:"Oct 3",  status:"complete" },
-          { title:"Annual revenue threshold check (< $30k exempt?)", who:"JR", due:"Oct 5",  status:"complete" },
-          { title:"Calculate GST — simplified return",               who:"JR", due:"Oct 10", status:"in_progress" },
-          { title:"Review and sign-off",                             who:"KS", due:"Oct 20", status:"pending" },
-          { title:"Submit return to CRA",                            who:"JR", due:"Oct 31", status:"pending" },
-          { title:"Record CRA confirmation number",                  who:"JR", due:"Oct 31", status:"pending" },
-        ],
-        docs: [
-          { name:"Bank Statement — Q3",    status:"received", reminderCount:0, uploadedAt:"Oct 4" },
-          { name:"Sales Invoices",         status:"received", reminderCount:0, uploadedAt:"Oct 4" },
-          { name:"Expense Receipts >$100", status:"received", reminderCount:0, uploadedAt:"Oct 4" },
-        ],
-      },
-    ],
-    activity: [
-      { t:"Oct 5 10:00", who:"James R.", act:"Simplified checklist applied",  detail:"Sole prop — no ITC reconciliation required" },
-      { t:"Oct 3 09:00", who:"System",   act:"Workflow auto-generated",       detail:"GST/HST Q3 2025" },
-    ],
-    emailLog: [],
-  },
-  {
-    id:"c_nort",
-    name:"Northbridge Logistics",
-    type:"Corporation", initials:"NL", freq:"Monthly",
-    city:"Ottawa, ON", since:"2018", bn:"55201 7214 RT0001",
-    assigned:"u_ks", netGst:6100, riskHistory:false, penaltyRisk:null,
-    workflows: [
-      {
-        id:"wf_nort_gst_sep", type:"GST/HST", label:"GST/HST — September 2025",
-        period:"Sep 2025", deadline:new Date("2025-10-31"), cycleStart:new Date("2025-09-01"),
-        curStage:6, taskInProgressDays:0,
-        stages: [
-          { n:1, name:"Bookkeeping",         status:"complete", gate:"", gateLabel:"" },
-          { n:2, name:"Document Collection", status:"complete", gate:"", gateLabel:"" },
-          { n:3, name:"Preparation",         status:"complete", gate:"", gateLabel:"" },
-          { n:4, name:"Review",              status:"complete", gate:"", gateLabel:"" },
-          { n:5, name:"Filing",              status:"complete", gate:"", gateLabel:"" },
-          { n:6, name:"Confirmation",        status:"complete", gate:"", gateLabel:"CRA conf #RT2025-48291 · Filed Oct 3" },
-        ],
-        tasks:[], docs:[],
-      },
-    ],
-    activity: [
-      { t:"Oct 3 11:00", who:"Kiera S.", act:"CRA confirmation recorded",  detail:"Filed Sep 30 — conf #RT2025-48291" },
-      { t:"Oct 2 15:00", who:"Kiera S.", act:"Return submitted to CRA",    detail:"Net GST: $6,100" },
-    ],
-    emailLog: [],
-  },
-  {
-    id:"c_lake",
-    name:"Lakeshore Dental Group",
-    type:"Corporation", initials:"LD", freq:"Quarterly",
-    city:"Kingston, ON", since:"2020", bn:"66312 9981 RT0001",
-    assigned:"u_jr", netGst:8120, riskHistory:false, penaltyRisk:null,
-    workflows: [
-      {
-        id:"wf_lake_gst_q3", type:"GST/HST", label:"GST/HST — Q3 2025",
-        period:"Q3 2025", deadline:new Date("2025-10-31"), cycleStart:new Date("2025-10-01"),
-        curStage:4, taskInProgressDays:0,
-        stages: [
-          { n:1, name:"Bookkeeping",         status:"complete",    gate:"", gateLabel:"Complete" },
-          { n:2, name:"Document Collection", status:"complete",    gate:"", gateLabel:"Complete" },
-          { n:3, name:"Preparation",         status:"complete",    gate:"", gateLabel:"Complete" },
-          { n:4, name:"Review",              status:"in_progress", gate:"preparationComplete = true", gateLabel:"Single review — $8,120 under dual-review threshold" },
-          { n:5, name:"Filing",              status:"pending",     gate:"reviewApproved = true",      gateLabel:"Waiting on Stage 4 review approval" },
-          { n:6, name:"Confirmation",        status:"pending",     gate:"filingComplete = true",      gateLabel:"Record CRA confirmation" },
-        ],
-        tasks:[], docs:[],
-      },
-    ],
-    activity: [
-      { t:"Oct 12 14:00", who:"James R.", act:"Draft sent to KS for review", detail:"Net GST: $8,120" },
-    ],
-    emailLog: [],
-  },
-];
-
 // ─── WORKFLOW-LEVEL ENGINE ────────────────────────────────────────────────────
 // Computes status PER WORKFLOW, then aggregates to client level.
 // C4 (stage stall) now reads taskInProgressDays from the workflow, not the client.
@@ -919,7 +658,7 @@ function Dashboard({ clients, onSelect, setView, onAddClient }) {
           <tbody>
             {clients.map((cl,i) => {
               const wf = cl.activeWf;
-              const u  = USERS[cl.assigned];
+              const u  = cl.assigned_user;
               return (
                 <tr key={cl.id} onClick={() => onSelect(cl)}
                   style={{ background:i%2===0?"white":"#FAFAFA", cursor:"pointer" }}
@@ -1016,7 +755,7 @@ function ClientList({ clients, onSelect }) {
       <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
         {filtered.map(cl => {
           const wf = cl.activeWf;
-          const u  = USERS[cl.assigned];
+          const u  = cl.assigned_user;
           return (
             <div key={cl.id} onClick={() => onSelect(cl)}
               style={{ background:"white", border:`1px solid ${C.border}`, borderRadius:10, padding:"13px 18px", cursor:"pointer", display:"flex", alignItems:"center", gap:14 }}
@@ -1206,23 +945,83 @@ function WorkflowTab({ wf, wfComputed, client, stageCfg, onRefresh }) {
   );
 }
 
-// ─── TASKS TAB (wired to DB, grouped by stage) ───────────────────────────────
+// ─── TASKS TAB (wired to DB, grouped by stage, with gate enforcement) ──────────
 const STAGE_NAMES = {
   1:"Bookkeeping", 2:"Document Collection", 3:"Preparation",
   4:"Review", 5:"Filing", 6:"Confirmation"
 };
 
 function TasksTab({ wf, onRefresh }) {
-  const [tasks, setTasks] = useState(wf.tasks || []);
-  const [saving, setSaving] = useState(null);
-  const [collapsed, setCollapsed] = useState({}); // stage_n → bool
+  const [tasks, setTasks]     = useState(wf.tasks || []);
+  const [saving, setSaving]   = useState(null);
+  const [error, setError]     = useState(null);
+  const [collapsed, setCollapsed] = useState({});
 
   const wfId = wf.id;
   const [lastId, setLastId] = useState(wfId);
   if (wfId !== lastId) { setTasks(wf.tasks || []); setLastId(wfId); }
 
-  async function toggleTask(task) {
+  // ── Gate: can tasks in stageN be checked? ─────────────────────────────────
+  function isStageGated(stageN) {
+    if (stageN <= 1) return { gated: false };
+    const byStage = groupByStage(tasks);
+    const prevN = stageN - 1;
+    const prevTasks = byStage[prevN] || [];
+
+    // Previous stage must be fully complete
+    if (prevTasks.length > 0 && !prevTasks.every(t => t.status === "complete")) {
+      const done  = prevTasks.filter(t => t.status === "complete").length;
+      const total = prevTasks.length;
+      return {
+        gated: true,
+        reason: `Stage ${prevN} must be complete first (${done}/${total} tasks done).`,
+      };
+    }
+
+    // Stage 3 specific: docs must all be received (mirrors the workflow gate)
+    if (stageN === 3) {
+      const docs = wf.documents ?? wf.docs ?? [];
+      const pending = docs.filter(d => d.status === "pending");
+      if (pending.length > 0) {
+        return {
+          gated: true,
+          reason: `Hard stop: ${pending.length} document${pending.length>1?"s":""} still pending in Stage 2. All documents must be received before Stage 3 tasks can begin.`,
+          hard: true,
+        };
+      }
+    }
+
+    // Stage 5: Stage 4 review stage must be complete (not just tasks)
+    if (stageN === 5) {
+      const stage4 = (wf.stages || []).find(s => s.n === 4);
+      if (stage4 && stage4.status !== "complete") {
+        return {
+          gated: true,
+          reason: "Hard stop: Stage 4 Review must be approved before Filing tasks can begin.",
+          hard: true,
+        };
+      }
+    }
+
+    return { gated: false };
+  }
+
+  function groupByStage(taskList) {
+    const g = {};
+    taskList.forEach(t => {
+      const sn = t.stage_n ?? 0;
+      if (!g[sn]) g[sn] = [];
+      g[sn].push(t);
+    });
+    return g;
+  }
+
+  async function toggleTask(task, stageN) {
     if (!task.id) return;
+    const gate = isStageGated(stageN);
+    if (gate.gated) { setError(gate.reason); return; }
+    setError(null);
+
     const newStatus = task.status === "complete" ? "in_progress" : "complete";
     setSaving(task.id);
     try {
@@ -1231,34 +1030,38 @@ function TasksTab({ wf, onRefresh }) {
         headers:{"Content-Type":"application/json"},
         body: JSON.stringify({ status: newStatus }),
       });
+      const data = await res.json();
       if (res.ok) {
         setTasks(prev => prev.map(t => t.id === task.id ? {...t, status: newStatus} : t));
         if (onRefresh) onRefresh();
+      } else {
+        setError(data.error || "Failed to update task.");
       }
-    } finally { setSaving(null); }
+    } catch(e) { setError("Network error."); }
+    finally { setSaving(null); }
   }
 
   if (!tasks.length)
     return <div style={{ background:C.amberBg, border:`1px solid #FCD34D`, borderRadius:8, padding:"16px 20px", fontSize:12, color:C.amber }}>⚠ No tasks loaded from database for this workflow.</div>;
 
-  // Group tasks by stage_n, preserving sort_order within each group
-  const byStage = {};
-  tasks.forEach(t => {
-    const sn = t.stage_n ?? 0;
-    if (!byStage[sn]) byStage[sn] = [];
-    byStage[sn].push(t);
-  });
+  const byStage   = groupByStage(tasks);
   const stageNums = Object.keys(byStage).map(Number).sort((a,b) => a-b);
 
   const tcfg = {
-    complete:    [C.greenBg,  C.green],
+    complete:    [C.greenBg,   C.green],
     in_progress: [C.primaryBg, C.primary],
-    pending:     ["#F1F5F9",  C.muted],
-    blocked:     [C.redBg,    C.red],
-    missed:      [C.redBg,    C.red],
+    pending:     ["#F1F5F9",   C.muted],
+    blocked:     [C.redBg,     C.red],
+    missed:      [C.redBg,     C.red],
   };
 
-  // Stage status derived from its tasks
+  const stageCfgMap = {
+    complete:    { bg:C.greenBg,   color:C.green,   label:"Complete",    icon:"✓" },
+    in_progress: { bg:C.primaryBg, color:C.primary,  label:"In Progress", icon:"●" },
+    blocked:     { bg:C.redBg,     color:C.red,      label:"Blocked",     icon:"🔒" },
+    pending:     { bg:"#F1F5F9",   color:C.muted,    label:"Pending",     icon:"○" },
+  };
+
   function stageStatus(stageTasks) {
     if (stageTasks.every(t => t.status === "complete"))   return "complete";
     if (stageTasks.some(t => t.status === "in_progress")) return "in_progress";
@@ -1266,22 +1069,15 @@ function TasksTab({ wf, onRefresh }) {
     return "pending";
   }
 
-  const stageCfgMap = {
-    complete:    { bg:C.greenBg,  color:C.green,   label:"Complete",     icon:"✓" },
-    in_progress: { bg:C.primaryBg,color:C.primary,  label:"In Progress",  icon:"●" },
-    blocked:     { bg:C.redBg,    color:C.red,      label:"Blocked",      icon:"🔒" },
-    pending:     { bg:"#F1F5F9",  color:C.muted,    label:"Pending",      icon:"○" },
-  };
-
-  // Summary line: X of Y complete
-  function stageSummary(stageTasks) {
-    const done  = stageTasks.filter(t => t.status === "complete").length;
-    const total = stageTasks.length;
-    return `${done}/${total} tasks complete`;
-  }
-
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+      {error && (
+        <div style={{ background:C.redBg, border:"1px solid #FCA5A5", borderRadius:8, padding:"10px 14px", fontSize:13, color:C.red, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+          <span>🔒 {error}</span>
+          <button onClick={() => setError(null)} style={{ background:"none", border:"none", color:C.red, cursor:"pointer", fontSize:16 }}>×</button>
+        </div>
+      )}
+
       {stageNums.map(sn => {
         const stageTasks = byStage[sn];
         const status     = stageStatus(stageTasks);
@@ -1289,70 +1085,77 @@ function TasksTab({ wf, onRefresh }) {
         const isOpen     = !collapsed[sn];
         const wfStage    = (wf.stages || []).find(s => s.n === sn);
         const stageName  = wfStage?.name || STAGE_NAMES[sn] || `Stage ${sn}`;
+        const gate       = isStageGated(sn);
+        const done       = stageTasks.filter(t => t.status === "complete").length;
 
         return (
-          <div key={sn} style={{ border:`1px solid ${status==="in_progress"?C.primary:status==="complete"?"#BBF7D0":C.border}`, borderRadius:10, overflow:"hidden", background:"white" }}>
+          <div key={sn} style={{ border:`1px solid ${status==="in_progress"?C.primary:status==="complete"?"#BBF7D0":gate.gated?C.border:C.border}`, borderRadius:10, overflow:"hidden", background:"white" }}>
 
-            {/* Stage header — clickable to collapse */}
+            {/* Stage header */}
             <div onClick={() => setCollapsed(p => ({...p,[sn]:!p[sn]}))}
-              style={{ display:"flex", alignItems:"center", gap:10, padding:"11px 16px", cursor:"pointer", background:status==="complete"?"#F0FDF4":status==="in_progress"?C.primaryBg:"white", borderBottom:isOpen?`1px solid ${C.border}`:"none" }}>
+              style={{ display:"flex", alignItems:"center", gap:10, padding:"11px 16px", cursor:"pointer", background:status==="complete"?"#F0FDF4":status==="in_progress"?C.primaryBg:gate.gated?"#F8FAFC":"white", borderBottom:isOpen?`1px solid ${C.border}`:"none" }}>
 
-              {/* Stage circle */}
-              <div style={{ width:26, height:26, borderRadius:"50%", background:scfg.bg, border:`2px solid ${scfg.color}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, color:scfg.color, fontWeight:700, flexShrink:0 }}>
-                {scfg.icon}
+              <div style={{ width:26, height:26, borderRadius:"50%", background:gate.gated&&status!=="complete"?"#F1F5F9":scfg.bg, border:`2px solid ${gate.gated&&status!=="complete"?C.border:scfg.color}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, color:gate.gated&&status!=="complete"?C.muted:scfg.color, fontWeight:700, flexShrink:0 }}>
+                {gate.gated && status !== "complete" ? "🔒" : scfg.icon}
               </div>
 
               <div style={{ flex:1 }}>
                 <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                  <span style={{ fontSize:13, fontWeight:600, color:C.text }}>Stage {sn}: {stageName}</span>
-                  <Pill label={scfg.label} bg={scfg.bg} color={scfg.color} />
+                  <span style={{ fontSize:13, fontWeight:600, color:gate.gated&&status!=="complete"?C.muted:C.text }}>Stage {sn}: {stageName}</span>
+                  <Pill label={gate.gated&&status!=="complete"?"Locked":scfg.label} bg={gate.gated&&status!=="complete"?"#F1F5F9":scfg.bg} color={gate.gated&&status!=="complete"?C.muted:scfg.color} />
                 </div>
-                <div style={{ fontSize:11, color:C.muted, marginTop:2 }}>{stageSummary(stageTasks)}</div>
+                <div style={{ fontSize:11, color:C.muted, marginTop:2 }}>{done}/{stageTasks.length} tasks complete</div>
               </div>
 
-              {/* Progress bar */}
               <div style={{ width:80, height:4, borderRadius:2, background:C.border, flexShrink:0 }}>
-                <div style={{ width:`${(stageTasks.filter(t=>t.status==="complete").length/stageTasks.length)*100}%`, height:"100%", borderRadius:2, background:scfg.color, transition:"width 0.3s" }} />
+                <div style={{ width:`${(done/stageTasks.length)*100}%`, height:"100%", borderRadius:2, background:scfg.color, transition:"width 0.3s" }} />
               </div>
 
               <span style={{ color:C.muted, fontSize:13 }}>{isOpen?"∧":"∨"}</span>
             </div>
 
-            {/* Task rows */}
             {isOpen && (
               <div>
+                {/* Gate banner inside stage */}
+                {gate.gated && status !== "complete" && (
+                  <div style={{ background:gate.hard?C.redBg:C.amberBg, borderBottom:`1px solid ${gate.hard?"#FCA5A5":"#FCD34D"}`, padding:"8px 16px", display:"flex", gap:8, alignItems:"flex-start" }}>
+                    <span style={{ fontSize:12, flexShrink:0 }}>{gate.hard?"🔒":"⚑"}</span>
+                    <span style={{ fontSize:12, color:gate.hard?C.red:C.amber, fontWeight:500 }}>
+                      {gate.hard ? "HARD STOP — " : ""}{gate.reason}
+                    </span>
+                  </div>
+                )}
+
                 {stageTasks.map((task, i) => {
                   const [tbg, tc] = tcfg[task.status] || tcfg.pending;
                   const isSaving  = saving === task.id;
-                  const assignee  = task.assigned_user?.name || task.assigned_initials || task.who || "—";
+                  const isLocked  = gate.gated && task.status !== "complete";
                   const isBlocked = task.status === "blocked";
+                  const assignee  = task.assigned_user?.name || task.assigned_initials || task.who || "—";
 
                   return (
                     <div key={task.id || i}
-                      style={{ display:"flex", alignItems:"center", gap:10, padding:"9px 16px 9px 20px", borderBottom:i<stageTasks.length-1?`1px solid ${C.border}`:"none", background:isBlocked?"#FFF8F8":"white" }}>
+                      style={{ display:"flex", alignItems:"center", gap:10, padding:"9px 16px 9px 20px", borderBottom:i<stageTasks.length-1?`1px solid ${C.border}`:"none", background:isBlocked||isLocked?"#FAFAFA":"white", opacity:isLocked&&status!=="complete"?0.7:1 }}>
 
-                      {/* Checkbox */}
-                      <button onClick={() => !isBlocked && toggleTask(task)}
-                        disabled={isSaving || !task.id || isBlocked}
-                        style={{ width:18, height:18, borderRadius:4, border:`2px solid ${task.status==="complete"?C.green:isBlocked?C.red:C.border}`, background:task.status==="complete"?C.green:"white", cursor:task.id&&!isBlocked?"pointer":"not-allowed", flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center" }}>
+                      <button onClick={() => !isLocked && !isBlocked && toggleTask(task, sn)}
+                        disabled={isSaving || !task.id || isLocked || isBlocked}
+                        style={{ width:18, height:18, borderRadius:4, border:`2px solid ${task.status==="complete"?C.green:isLocked||isBlocked?C.border:C.border}`, background:task.status==="complete"?C.green:"white", cursor:(!isLocked&&!isBlocked&&task.id)?"pointer":"not-allowed", flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center" }}>
                         {task.status==="complete" && <span style={{ color:"white", fontSize:10, fontWeight:700 }}>✓</span>}
                         {isSaving && <span style={{ color:C.muted, fontSize:9 }}>…</span>}
-                        {isBlocked && <span style={{ fontSize:9 }}>🔒</span>}
+                        {(isLocked || isBlocked) && task.status !== "complete" && <span style={{ fontSize:8, color:C.muted }}>—</span>}
                       </button>
 
-                      {/* Task info */}
                       <div style={{ flex:1 }}>
-                        <div style={{ fontSize:13, color:task.status==="complete"?C.muted:isBlocked?C.red:C.text, textDecoration:task.status==="complete"?"line-through":"none", fontWeight:task.status==="in_progress"?600:400 }}>
+                        <div style={{ fontSize:13, color:task.status==="complete"?C.muted:isLocked?C.muted:C.text, textDecoration:task.status==="complete"?"line-through":"none", fontWeight:task.status==="in_progress"?600:400 }}>
                           {task.title}
                         </div>
                         <div style={{ fontSize:11, color:C.muted, marginTop:1, display:"flex", gap:10 }}>
                           <span>👤 {assignee}</span>
                           {(task.due_date||task.due) && <span>📅 {task.due_date||task.due}</span>}
-                          {!task.id && <span style={{ color:C.amber }}>⚠ no DB id</span>}
                         </div>
                       </div>
 
-                      <Pill label={task.status.replace("_"," ")} bg={tbg} color={tc} />
+                      <Pill label={isLocked&&task.status!=="complete"?"locked":task.status.replace("_"," ")} bg={isLocked&&task.status!=="complete"?"#F1F5F9":tbg} color={isLocked&&task.status!=="complete"?C.muted:tc} />
                     </div>
                   );
                 })}
@@ -1655,12 +1458,286 @@ function ActivityTab({ clientId }) {
   );
 }
 
+
+// ─── INTEGRATION TAB (wired to DB) ───────────────────────────────────────────
+function IntegrationTab({ clientId }) {
+  const [integrations, setIntegrations] = useState([]);
+  const [loading, setLoading]           = useState(true);
+  const [portalLink, setPortalLink]     = useState(null);
+  const [generatingLink, setGeneratingLink] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/integrations", { credentials:"include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(json => { if (json?.data) setIntegrations(json.data); })
+      .catch(()=>{})
+      .finally(() => setLoading(false));
+  }, []);
+
+  async function generatePortalLink() {
+    setGeneratingLink(true);
+    try {
+      const res  = await fetch("/api/portal/tokens", {
+        method:"POST", credentials:"include",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ client_id: clientId }),
+      });
+      const data = await res.json();
+      if (res.ok) setPortalLink(data.portal_url || data.url || JSON.stringify(data));
+    } catch(e) {}
+    finally { setGeneratingLink(false); }
+  }
+
+  const statusCfg = {
+    connected:       { label:"Connected",       bg:C.greenBg,   color:C.green },
+    disconnected:    { label:"Not Connected",   bg:"#F1F5F9",   color:C.muted },
+    token_expired:   { label:"Token Expired",   bg:C.redBg,     color:C.red },
+    token_expiring:  { label:"Expiring Soon",   bg:C.amberBg,   color:C.amber },
+    error:           { label:"Error",           bg:C.redBg,     color:C.red },
+  };
+
+  const PROVIDERS = [
+    { key:"qbo",  name:"QuickBooks Online",  desc:"Auto-sync bookkeeping → Stage 1 gate hands-free when reconciliation complete", authUrl:"/api/integrations/qbo" },
+    { key:"zoho", name:"Zoho Books",         desc:"Alternative accounting integration — same Stage 1 auto-advance", authUrl:"/api/integrations/zoho" },
+  ];
+
+  return (
+    <div>
+      <div style={{ fontSize:13, fontWeight:600, color:C.text, marginBottom:14 }}>Integrations</div>
+
+      {/* Accounting integrations */}
+      {PROVIDERS.map(p => {
+        const found = integrations.find(i => i.provider === p.key);
+        const sc    = statusCfg[found?.token_status || found?.status || "disconnected"];
+        const isConnected = found?.status === "connected";
+        return (
+          <Card key={p.key} style={{ padding:"16px 20px", marginBottom:10 }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:10 }}>
+              <div>
+                <div style={{ fontSize:14, fontWeight:600, color:C.text }}>{p.name}</div>
+                <div style={{ fontSize:12, color:C.muted, marginTop:2 }}>{p.desc}</div>
+                {isConnected && found?.company_name && (
+                  <div style={{ fontSize:11, color:C.green, marginTop:3 }}>✓ Connected to: {found.company_name}</div>
+                )}
+                {isConnected && found?.last_synced_at && (
+                  <div style={{ fontSize:11, color:C.muted }}>Last sync: {new Date(found.last_synced_at).toLocaleString("en-CA",{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"})}</div>
+                )}
+                {found?.last_sync_error && (
+                  <div style={{ fontSize:11, color:C.red, marginTop:3 }}>⚠ {found.last_sync_error}</div>
+                )}
+              </div>
+              <Pill label={loading?"Loading…":sc.label} bg={sc.bg} color={sc.color} />
+            </div>
+            {!isConnected ? (
+              <button onClick={() => window.location.href = p.authUrl}
+                style={{ background:C.primary, color:"white", border:"none", borderRadius:8, padding:"7px 14px", fontSize:13, fontWeight:600, cursor:"pointer" }}>
+                Connect {p.name} →
+              </button>
+            ) : (
+              <button onClick={() => fetch(`/api/integrations/${found.id}`, { method:"DELETE", credentials:"include" }).then(() => setIntegrations(prev => prev.filter(i => i.id !== found.id)))}
+                style={{ background:"none", border:`1px solid ${C.border}`, borderRadius:8, padding:"6px 14px", fontSize:12, color:C.muted, cursor:"pointer" }}>
+                Disconnect
+              </button>
+            )}
+          </Card>
+        );
+      })}
+
+      {/* Client portal link */}
+      <Card style={{ padding:"16px 20px" }}>
+        <div style={{ fontSize:14, fontWeight:600, color:C.text, marginBottom:4 }}>Client Portal</div>
+        <div style={{ fontSize:12, color:C.muted, marginBottom:12 }}>
+          Generate a secure link for this client to upload documents directly — no login required. Link expires in 7 days.
+        </div>
+        {portalLink ? (
+          <div>
+            <div style={{ background:C.greenBg, border:"1px solid #BBF7D0", borderRadius:8, padding:"8px 12px", marginBottom:8, fontSize:12, color:"#14532D", wordBreak:"break-all" }}>
+              ✓ {portalLink}
+            </div>
+            <div style={{ display:"flex", gap:8 }}>
+              <button onClick={() => navigator.clipboard.writeText(portalLink)}
+                style={{ background:C.primaryBg, color:C.primary, border:`1px solid #BFDBFE`, borderRadius:8, padding:"6px 14px", fontSize:12, fontWeight:600, cursor:"pointer" }}>
+                Copy Link
+              </button>
+              <button onClick={() => setPortalLink(null)}
+                style={{ background:"none", border:`1px solid ${C.border}`, borderRadius:8, padding:"6px 14px", fontSize:12, color:C.muted, cursor:"pointer" }}>
+                Generate New
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button onClick={generatePortalLink} disabled={generatingLink}
+            style={{ background:C.primary, color:"white", border:"none", borderRadius:8, padding:"7px 14px", fontSize:13, fontWeight:600, cursor:generatingLink?"not-allowed":"pointer", opacity:generatingLink?0.7:1 }}>
+            {generatingLink ? "Generating…" : "Generate Portal Link →"}
+          </button>
+        )}
+      </Card>
+    </div>
+  );
+}
+
+// ─── EDIT CLIENT MODAL ────────────────────────────────────────────────────────
+function EditClientModal({ client, onClose, onSaved }) {
+  const [form, setForm] = useState({
+    name:    client.name    || "",
+    type:    client.type    || "Corporation",
+    freq:    client.freq    || "Monthly",
+    city:    client.city    || "",
+    since:   client.since   || "",
+    bn:      client.bn      || "",
+    net_gst: client.netGst  || client.net_gst || "",
+  });
+  const [saving, setSaving]   = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError]     = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  async function save() {
+    setSaving(true); setError(null);
+    try {
+      const res  = await fetch(`/api/clients/${client.id}`, {
+        method:"PATCH", credentials:"include",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ ...form, net_gst: form.net_gst ? Number(form.net_gst) : null }),
+      });
+      const data = await res.json();
+      if (res.ok) { onSaved(); onClose(); }
+      else setError(data.error || "Failed to save.");
+    } catch(e) { setError("Network error."); }
+    finally { setSaving(false); }
+  }
+
+  async function deleteClient() {
+    setDeleting(true); setError(null);
+    try {
+      const res = await fetch(`/api/clients/${client.id}`, { method:"DELETE", credentials:"include" });
+      if (res.ok) { onSaved(); onClose(); }
+      else { const d = await res.json(); setError(d.error || "Failed to delete."); }
+    } catch(e) { setError("Network error."); }
+    finally { setDeleting(false); }
+  }
+
+  const inp = (label, key, type="text", opts=null) => (
+    <div key={key}>
+      <label style={{ display:"block", fontSize:11, fontWeight:600, color:C.muted, marginBottom:4, textTransform:"uppercase", letterSpacing:"0.05em" }}>{label}</label>
+      {opts
+        ? <select value={form[key]} onChange={e => setForm(f=>({...f,[key]:e.target.value}))}
+            style={{ width:"100%", padding:"7px 10px", borderRadius:8, border:`1px solid ${C.border}`, fontSize:13, outline:"none", background:"white" }}>
+            {opts.map(o => <option key={o}>{o}</option>)}
+          </select>
+        : <input type={type} value={form[key]||""} onChange={e => setForm(f=>({...f,[key]:e.target.value}))}
+            style={{ width:"100%", padding:"7px 10px", borderRadius:8, border:`1px solid ${C.border}`, fontSize:13, outline:"none", boxSizing:"border-box" }} />
+      }
+    </div>
+  );
+
+  return (
+    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.4)", zIndex:100, display:"flex", alignItems:"center", justifyContent:"center" }}>
+      <div style={{ background:"white", borderRadius:14, padding:"26px 30px", width:460, maxHeight:"85vh", overflowY:"auto", boxShadow:"0 20px 60px rgba(0,0,0,0.2)" }}>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:18 }}>
+          <div style={{ fontSize:15, fontWeight:700, color:C.text }}>Edit Client</div>
+          <button onClick={onClose} style={{ background:"none", border:"none", fontSize:20, color:C.muted, cursor:"pointer" }}>×</button>
+        </div>
+        {error && <div style={{ background:C.redBg, border:"1px solid #FCA5A5", borderRadius:8, padding:"8px 12px", fontSize:12, color:C.red, marginBottom:12 }}>{error}</div>}
+        <div style={{ display:"flex", flexDirection:"column", gap:12, marginBottom:16 }}>
+          {inp("Client Name","name")}
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+            {inp("Entity Type","type","text",["Corporation","Sole prop","Partnership"])}
+            {inp("Filing Frequency","freq","text",["Monthly","Quarterly","Annual"])}
+          </div>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+            {inp("City","city")}
+            {inp("Client Since","since")}
+          </div>
+          {inp("CRA Business Number","bn")}
+          {inp("Net GST Amount","net_gst","number")}
+        </div>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+          {!confirmDelete
+            ? <button onClick={() => setConfirmDelete(true)} style={{ background:"none", border:"none", color:C.red, fontSize:12, cursor:"pointer" }}>Delete client…</button>
+            : <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+                <span style={{ fontSize:12, color:C.red }}>Are you sure?</span>
+                <button onClick={deleteClient} disabled={deleting}
+                  style={{ background:C.red, color:"white", border:"none", borderRadius:6, padding:"5px 12px", fontSize:12, cursor:"pointer" }}>
+                  {deleting?"Deleting…":"Yes, delete"}
+                </button>
+                <button onClick={() => setConfirmDelete(false)} style={{ background:"none", border:`1px solid ${C.border}`, borderRadius:6, padding:"5px 12px", fontSize:12, cursor:"pointer" }}>Cancel</button>
+              </div>
+          }
+          <div style={{ display:"flex", gap:8 }}>
+            <Btn onClick={onClose}>Cancel</Btn>
+            <button onClick={save} disabled={saving}
+              style={{ background:C.primary, color:"white", border:"none", borderRadius:8, padding:"7px 16px", fontSize:13, fontWeight:600, cursor:saving?"not-allowed":"pointer", opacity:saving?0.7:1 }}>
+              {saving ? "Saving…" : "Save Changes"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── CLIENT WORKSPACE ────────────────────────────────────────────────────────
-function ClientWorkspace({ client, onBack, onRefresh }) {
-  const [tab, setTab] = useState("workflow");
-  const [wfIdx, setWfIdx] = useState(0);
-  const wf = client.workflows[wfIdx];
-  const u  = USERS[client.assigned];
+function ClientWorkspace({ client: initialClient, onBack, onRefresh }) {
+  const [tab, setTab]         = useState("workflow");
+  const [wfIdx, setWfIdx]     = useState(0);
+  const [client, setClient]   = useState(initialClient);
+  const [refreshing, setRefreshing] = useState(false);
+  const [showEdit, setShowEdit]       = useState(false);
+
+  // Re-fetch fresh client data from DB on mount and after any action
+  async function refreshClient() {
+    if (!initialClient?.id) return;
+    setRefreshing(true);
+    try {
+      const res  = await fetch(`/api/clients/${initialClient.id}`, { credentials:"include" });
+      const data = await res.json();
+      if (res.ok && data) {
+        // Map DB fields to UI shape (same as useClients mapper)
+        const mapped = {
+          ...data,
+          type:           data.client_type  ?? data.type,
+          freq:           data.filing_freq  ?? data.freq,
+          assigned:       data.assigned_to  ?? data.assigned,
+          status:         data.computed_status ?? data.status ?? "On Track",
+          flags:          data.computed_flags  ?? data.flags  ?? [],
+          daysToDeadline: data.days_to_deadline ?? null,
+          riskHistory:    data.risk_history ?? false,
+          penaltyRisk:    data.penalty_risk ?? null,
+          netGst:         data.net_gst ?? null,
+          workflows: (data.workflows ?? []).map(wf => ({
+            ...wf,
+            stages:     (wf.stages ?? []).sort((a,b)=>(a.n??0)-(b.n??0)),
+            tasks:      (wf.tasks ?? []).sort((a,b)=>((a.stage_n??0)-(b.stage_n??0))||((a.sort_order??0)-(b.sort_order??0))),
+            docs:       wf.documents ?? wf.docs ?? [],
+            stageNotes: wf.stage_notes ?? {},
+            curStage:   wf.cur_stage ?? 1,
+            taskInProgressDays: wf.task_in_progress_days ?? 0,
+            cycleStart: wf.cycle_start ? new Date(wf.cycle_start) : null,
+            deadline:   wf.deadline    ? new Date(wf.deadline)    : null,
+            computed: {
+              status: wf.computed_status ?? "On Track",
+              flags:  wf.computed_flags  ?? [],
+            },
+            daysToDeadline: wf.days_to_deadline ?? null,
+          })),
+        };
+        setClient(mapped);
+      }
+    } catch(e) { console.error("ClientWorkspace re-fetch failed:", e); }
+    finally { setRefreshing(false); }
+  }
+
+  useEffect(() => { refreshClient(); }, [initialClient?.id]);
+
+  // Combined refresh: update client list AND re-fetch this client
+  function handleRefresh() {
+    refreshClient();
+    if (onRefresh) onRefresh();
+  }
+
+  const wf = client.workflows?.[wfIdx];
+  const u  = client.assigned_user;
   const missingDocs = (wf?.docs||[]).filter(d => d.status==="pending");
   const wfComputed  = wf?.computed || {};
 
@@ -1674,7 +1751,14 @@ function ClientWorkspace({ client, onBack, onRefresh }) {
 
   return (
     <div>
-      <button onClick={onBack} style={{ background:"none", border:"none", color:C.primary, cursor:"pointer", fontSize:13, fontWeight:500, padding:0, marginBottom:14 }}>← Back</button>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14 }}>
+        <button onClick={onBack} style={{ background:"none", border:"none", color:C.primary, cursor:"pointer", fontSize:13, fontWeight:500, padding:0 }}>← Back</button>
+        {refreshing && <span style={{ fontSize:11, color:C.muted }}>Refreshing…</span>}
+        <button onClick={() => setShowEdit(true)}
+          style={{ background:"none", border:`1px solid ${C.border}`, borderRadius:7, padding:"5px 12px", fontSize:12, color:C.muted, cursor:"pointer" }}>
+          ✎ Edit Client
+        </button>
+      </div>
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:14 }}>
         <div style={{ display:"flex", gap:12, alignItems:"center" }}>
           <Avatar name={client.name} size={48} />
@@ -1719,18 +1803,20 @@ function ClientWorkspace({ client, onBack, onRefresh }) {
         </div>
       ))}
 
-      {/* Intelligence panel */}
+      {/* Intelligence panel — derived from real DB data */}
       <div style={{ background:"#F0F9FF", border:"1px solid #BAE6FD", borderRadius:10, padding:"12px 16px", marginBottom:16 }}>
-        <div style={{ fontSize:12, fontWeight:600, color:"#0369A1", marginBottom:8 }}>🧠 Active Intelligence Rules — {wf?.label}</div>
+        <div style={{ fontSize:12, fontWeight:600, color:"#0369A1", marginBottom:8 }}>🧠 Active Rules — {wf?.label}</div>
         <div style={{ display:"flex", flexDirection:"column", gap:5 }}>
-          {client.type==="Corporation" && <RuleRow icon="✓" text="Corporation — ITC reconciliation task added; dual review if GST > $10,000" color="#0369A1" />}
-          {client.type==="Sole prop"   && <RuleRow icon="✓" text="Sole proprietor — simplified checklist; revenue threshold check; no ITCs" color="#0369A1" />}
-          {client.netGst>10000         && <RuleRow icon="✓" text={`GST $${client.netGst?.toLocaleString()} > $10,000 — dual review required`} color="#0369A1" />}
-          {client.netGst<0             && <RuleRow icon="⚑" text="Refund claim — justification documentation required before filing" color={C.amber} />}
-          {client.riskHistory          && <RuleRow icon="⚑" text="High-risk client — missed CRA deadline in last 12 months; senior auto-assigned to Stage 3" color={C.red} />}
-          {missingDocs.length>0        && <RuleRow icon="⚑" text={`${missingDocs.length} doc${missingDocs.length>1?"s":""} pending — Stage 3 hard-blocked`} color={C.red} />}
-          {client.emailLog?.length>0   && <RuleRow icon="⚑" text={`Reminder #${client.emailLog.length} sent — escalation active`} color={C.amber} />}
-          <RuleRow icon="○" text="QuickBooks integration — Phase 4 (bookkeeping status set manually for now)" color={C.slate} />
+          {client.type==="Corporation" && <RuleRow icon="✓" text="Corporation — ITC reconciliation task auto-added; dual review gate if GST > $10,000" color="#0369A1" />}
+          {client.type==="Sole prop"   && <RuleRow icon="✓" text="Sole prop — simplified checklist; annual revenue threshold check; no ITCs" color="#0369A1" />}
+          {(client.netGst||client.net_gst)>10000 && <RuleRow icon="✓" text={`GST $${(client.netGst||client.net_gst)?.toLocaleString()} > $10,000 — dual review required (Stage 4 gate)`} color="#0369A1" />}
+          {(client.netGst||client.net_gst)<0     && <RuleRow icon="⚑" text="Refund claim — justification documentation required before Stage 4 approval" color={C.amber} />}
+          {(client.riskHistory||client.risk_history) && <RuleRow icon="⚑" text="High-risk — missed CRA deadline in last 12 months; senior CPA auto-assigned to Stage 3" color={C.red} />}
+          {missingDocs.length>0 && <RuleRow icon="⚑" text={`${missingDocs.length} doc${missingDocs.length>1?"s":""} still pending — Stage 3 tasks hard-locked`} color={C.red} />}
+          {client.flags?.length>0 && client.flags.map((f,i) => (
+            <RuleRow key={i} icon="⚑" text={f.replace(/^C\d: /,"")} color={client.status==="Overdue"?C.red:C.amber} />
+          ))}
+          {(client.workflows||[]).some(w=>w.type==="Bookkeeping") && <RuleRow icon="✓" text="Bookkeeping workflow linked — Stage 1 auto-advances when bookkeeping signed off" color="#0369A1" />}
         </div>
       </div>
 
@@ -1743,49 +1829,36 @@ function ClientWorkspace({ client, onBack, onRefresh }) {
 
       {/* WORKFLOW TAB — with gate enforcement + stage advancement */}
       {tab==="workflow" && wf && (
-        <WorkflowTab wf={wf} wfComputed={wfComputed} client={client} stageCfg={stageCfg} onRefresh={onRefresh} />
+        <WorkflowTab wf={wf} wfComputed={wfComputed} client={client} stageCfg={stageCfg} onRefresh={handleRefresh} />
       )}
 
       {/* TASKS TAB */}
       {tab==="tasks" && wf && (
-        <TasksTab wf={wf} onRefresh={onRefresh} />
+        <TasksTab wf={wf} onRefresh={handleRefresh} />
       )}
 
       {/* DOCUMENTS TAB */}
       {tab==="documents" && wf && (
-        <DocumentsTab wf={wf} client={client} onRefresh={onRefresh} />
+        <DocumentsTab wf={wf} client={client} onRefresh={handleRefresh} />
       )}
 
       {/* ACTIVITY TAB */}
       {tab==="activity" && (
-        <ActivityTab clientId={client.id} />
+        <ActivityTab clientId={client.id} key={client.id} />
       )}
 
       {/* INTEGRATION TAB */}
       {tab==="integration" && (
-        <div>
-          <div style={{ fontSize:13, fontWeight:600, color:C.text, marginBottom:14 }}>Integration Status — Phase 4</div>
-          <Card style={{ padding:"16px 20px", marginBottom:12 }}>
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}>
-              <div>
-                <div style={{ fontSize:14, fontWeight:600, color:C.text }}>QuickBooks Online</div>
-                <div style={{ fontSize:12, color:C.muted, marginTop:2 }}>Auto-sync bookkeeping status — Stage 1 gate becomes hands-free</div>
-              </div>
-              <Pill label="Not Connected" bg="#F1F5F9" color={C.muted} />
-            </div>
-            <div style={{ background:"#F8FAFC", borderRadius:8, padding:"10px 14px", fontSize:12, color:C.muted, marginBottom:12 }}>
-              Currently: <code style={{ background:C.border, borderRadius:4, padding:"1px 5px", fontSize:11 }}>bookkeepingStatus: "complete"</code> — set manually until QBO connected.
-            </div>
-            <Btn disabled>Connect QuickBooks (Phase 4)</Btn>
-          </Card>
-          <Card style={{ padding:"16px 20px" }}>
-            <div style={{ fontSize:14, fontWeight:600, color:C.text, marginBottom:4 }}>Zoho Books</div>
-            <div style={{ fontSize:12, color:C.muted, marginBottom:10 }}>Alternative accounting integration — Phase 4</div>
-            <Pill label="Roadmap" bg="#F1F5F9" color={C.muted} />
-          </Card>
-        </div>
+        <IntegrationTab clientId={client.id} />
       )}
     </div>
+    {showEdit && (
+      <EditClientModal
+        client={client}
+        onClose={() => setShowEdit(false)}
+        onSaved={() => { setShowEdit(false); handleRefresh(); }}
+      />
+    )}
   );
 }
 
@@ -1975,193 +2048,609 @@ function WorkflowTemplates() {
 // ─── ROADMAP ─────────────────────────────────────────────────────────────────
 function RoadmapPage() {
   const phases = [
-    { id:0, label:"Phase 0", name:"Demo Prototype", status:"current", goal:"Sell the idea. Show to firms, close pilots.", cost:"$0", customers:"0",
-      items:["Workflow-level At Risk engine — C1–C5 per workflow ✓","Per-workflow status aggregated to client level ✓","Visual gate enforcement — hard stops with reasons ✓","Three demo clients + 3 supporting clients ✓","Activity feed, multi-workflow selector ✓","Roadmap, Why Us, Deadlines, All Workflows views ✓"],
-      stack:["React (local) — no backend needed yet"] },
-    { id:1, label:"Phase 1", name:"Interactive MVP", status:"next", goal:"Make it real enough to use. First 3 paying customers.", cost:"$0/month", customers:"1–3",
-      items:["Replace mock data with Supabase fetch","Basic CRUD: create client, update status, save tasks","Stage blocking logic wired to real data","Client type branching live in backend"],
-      stack:["Supabase free (PostgreSQL + Auth + Storage)","Next.js + Vercel (free)"] },
-    { id:2, label:"Phase 2", name:"Usable Product", status:"roadmap", goal:"People rely on it daily.", cost:"$0–$25/month", customers:"3–10",
-      items:["Supabase Auth + multi-user roles","Status auto-change on task completion","File uploads via Supabase Storage","T1 + T2 + Bookkeeping workflow templates"],
-      stack:["Supabase Auth + Storage"] },
-    { id:3, label:"Phase 3", name:"Retention Engine", status:"roadmap", goal:"Firms can't run without it.", cost:"$25–$75/month", customers:"10–50",
-      items:["Transactional email: Resend (reminders, escalations)","Automation rules engine","Forward-looking intelligence alerts","Cloudflare R2 (free egress)"],
-      stack:["Resend (~$20/mo)","Cloudflare R2","BullMQ + Upstash Redis"] },
-    { id:4, label:"Phase 4", name:"Integrations", status:"roadmap", goal:"Plug into real firm workflows.", cost:"$50–$150/month", customers:"50–200",
-      items:["QuickBooks Online API — auto-sync bookkeeping status","Client portal","Billing triggers on filing completion"],
-      stack:["QBO OAuth API","Stripe"] },
-    { id:5, label:"Phase 5", name:"AI Layer", status:"roadmap", goal:"Intelligence on top of clean data.", cost:"$50–$200/month", customers:"200+",
-      items:["Risk prediction from client history","Priority suggestions: 'Start with Patel'","Anomaly detection: GST 3× higher than last quarter","Smart document pre-population"],
-      stack:["Anthropic API — only after PMF"] },
+    {
+      id:0, label:"Phase 0", name:"Demo Prototype", status:"done",
+      goal:"Validate the idea. Static React prototype shown to accounting firms.",
+      cost:"$0", customers:"0",
+      items:[
+        "Workflow-level At Risk engine (C1–C5 conditions) ✓",
+        "Visual gate enforcement — hard stops with reasons ✓",
+        "6 demo clients covering all status types ✓",
+        "CRA deadline reference + deadlines calendar ✓",
+        "All 8 views: Dashboard, Clients, Workflows, Deadlines, Templates, Why Us, Roadmap, Settings ✓",
+      ],
+      stack:["React (local) — no backend"],
+    },
+    {
+      id:1, label:"Phase 1", name:"Backend + DB", status:"done",
+      goal:"Make it real. Every action writes to Supabase. First paying customers.",
+      cost:"$0/month", customers:"1–3",
+      items:[
+        "Supabase PostgreSQL — 14 migrations, full schema ✓",
+        "Next.js App Router + Vercel deployment ✓",
+        "All API routes live: clients, workflows, stages, tasks, documents, users, settings ✓",
+        "useClients() fetches from /api/clients — no more mock data ✓",
+        "Stage PATCH → gate enforcement server-side → auto-recompute computed_status ✓",
+        "Task PATCH → auto_advance_stage() Postgres function ✓",
+        "Document PATCH → marks received, unblocks Stage 3 ✓",
+        "RLS row-level security — firm data isolation ✓",
+      ],
+      stack:["Supabase (PostgreSQL + Auth + RLS + Storage)", "Next.js 14 + Vercel"],
+    },
+    {
+      id:2, label:"Phase 2", name:"Workflow Engine", status:"done",
+      goal:"Templates, roles, full task lifecycle, gate enforcement in UI.",
+      cost:"$0/month", customers:"3–10",
+      items:[
+        "workflow-templates.ts — GST/HST, T2, T1, Payroll, Bookkeeping templates ✓",
+        "POST /api/workflows auto-generates 6 stages + tasks + docs from template ✓",
+        "Client type branching (Corporation vs Sole prop) in templates ✓",
+        "Supabase Auth + multi-user roles (owner, senior_accountant, accountant, admin) ✓",
+        "Users & Roles UI in Settings — invite, role change ✓",
+        "Task gate enforcement in UI — Stage N locked until Stage N-1 complete ✓",
+        "Stage 3 hard stop — tasks locked until all docs received ✓",
+        "Add Client modal — 2-step: client info → first workflow ✓",
+      ],
+      stack:["Supabase Auth", "workflow-templates.ts"],
+    },
+    {
+      id:3, label:"Phase 3", name:"Communications", status:"done",
+      goal:"Automated email reminders, escalations, and document request flow.",
+      cost:"$25–$75/month", customers:"10–50",
+      items:[
+        "Resend transactional email — doc reminders, escalations ✓",
+        "POST /api/documents/request — sends Reminder #1 / #2 via Resend ✓",
+        "Send Request modal in UI — shows email preview before sending ✓",
+        "Email escalation: Reminder #2 auto-CCs firm owner ✓",
+        "Automation rules engine (Settings → Automation tab) ✓",
+        "Document upload via /api/upload — marks received in DB ✓",
+        "Activity feed fetches from events table — real audit trail ✓",
+      ],
+      stack:["Resend (~$20/mo)", "Supabase Storage"],
+    },
+    {
+      id:4, label:"Phase 4", name:"Integrations", status:"done",
+      goal:"QBO sync, client portal, Stripe billing, webhook handlers.",
+      cost:"$50–$150/month", customers:"50–200",
+      items:[
+        "QuickBooks Online OAuth — lib/integrations/qbo.ts + webhook handler ✓",
+        "Zoho Books OAuth — lib/integrations/zoho.ts ✓",
+        "Client portal — /api/portal/tokens, /api/portal/[token]/upload ✓",
+        "Stripe billing — /api/billing/checkout, /api/billing/portal ✓",
+        "Billing plan UI in Settings → Billing tab ✓",
+        "Webhook handlers: QBO, Stripe, Resend, Zoho ✓",
+        "Workflow links — Bookkeeping → auto-advance GST Stage 1 ✓",
+      ],
+      stack:["QBO OAuth API", "Stripe", "Zoho API", "Cloudflare R2"],
+    },
+    {
+      id:5, label:"Phase 5", name:"AI Layer", status:"next",
+      goal:"Intelligence on top of 6+ months of real usage data.",
+      cost:"$50–$200/month", customers:"200+",
+      items:[
+        "Risk prediction — learn from client filing history, flag earlier",
+        "Priority suggestions — 'Start with Patel today: 3 days to deadline'",
+        "Anomaly detection — 'GST 60% lower than last quarter — review before filing'",
+        "Smart document pre-population — based on this client's history",
+        "Natural language dashboard summaries",
+      ],
+      stack:["Anthropic API — only after PMF + 6 months data"],
+    },
   ];
-  const ss = { current:{bg:C.primaryBg,color:C.primary,label:"You are here"}, next:{bg:C.greenBg,color:C.green,label:"Build next"}, roadmap:{bg:"#F1F5F9",color:C.muted,label:"Roadmap"} };
+
+  const statusCfg = {
+    done: { bg:C.greenBg,   color:C.green,   border:"#BBF7D0", label:"✓ Complete" },
+    next: { bg:C.amberBg,   color:C.amber,   border:"#FCD34D", label:"▶ Up Next" },
+    roadmap: { bg:"#F1F5F9", color:C.muted,  border:C.border,  label:"Roadmap" },
+  };
+
   return (
     <div>
-      <SectionHead title="Build Roadmap" sub="Only add complexity when users demand it" />
+      <SectionHead title="Build Phases" sub="Where we are and what's next" />
+
+      {/* Current status banner */}
+      <div style={{ background:C.greenBg, border:"1px solid #BBF7D0", borderRadius:10, padding:"14px 18px", marginBottom:20 }}>
+        <div style={{ fontSize:13, fontWeight:600, color:C.green, marginBottom:4 }}>✓ Phase 0 → Phase 4 complete</div>
+        <div style={{ fontSize:12, color:"#14532D" }}>
+          The product is live at acct-os.vercel.app. All 4 phases are shipped: full Supabase backend, workflow engine with templates, automated email reminders, QBO/Zoho integrations, Stripe billing, and client portal. Phase 5 (AI layer) begins after 6 months of real usage data.
+        </div>
+      </div>
+
       <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
         {phases.map(ph => {
-          const s = ss[ph.status];
+          const s = statusCfg[ph.status] || statusCfg.roadmap;
           return (
-            <Card key={ph.id} style={{ padding:"18px 20px", borderLeft:`4px solid ${s.color}` }}>
-              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:12 }}>
+            <Card key={ph.id} style={{ padding:"16px 20px", borderLeft:`4px solid ${s.color}`, background:ph.status==="next"?"#FFFBEB":"white" }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:10 }}>
                 <div>
                   <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:3 }}>
-                    <span style={{ fontSize:15, fontWeight:700, color:C.text }}>{ph.label}: {ph.name}</span>
+                    <span style={{ fontSize:14, fontWeight:700, color:C.text }}>{ph.label}: {ph.name}</span>
                     <Pill label={s.label} bg={s.bg} color={s.color} />
                   </div>
                   <div style={{ fontSize:12, color:C.muted }}>{ph.goal}</div>
                 </div>
-                <div style={{ display:"flex", gap:8 }}>
+                <div style={{ display:"flex", gap:8, flexShrink:0 }}>
                   <Pill label={ph.cost} bg="#F1F5F9" color={C.text} />
                   <Pill label={`${ph.customers} customers`} bg="#F1F5F9" color={C.muted} />
                 </div>
               </div>
-              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
-                <div>
-                  <div style={{ fontSize:11, fontWeight:600, color:C.muted, marginBottom:5, textTransform:"uppercase", letterSpacing:"0.05em" }}>Build</div>
-                  {ph.items.map((item,i) => (
-                    <div key={i} style={{ display:"flex", gap:6, marginBottom:4, fontSize:12, color:C.text }}>
-                      <span style={{ color:ph.status==="current"?C.green:C.slate, flexShrink:0 }}>{ph.status==="current"?"✓":"○"}</span>{item}
-                    </div>
-                  ))}
-                </div>
-                <div>
-                  <div style={{ fontSize:11, fontWeight:600, color:C.muted, marginBottom:5, textTransform:"uppercase", letterSpacing:"0.05em" }}>Stack</div>
-                  {ph.stack.map((s,i) => <div key={i} style={{ display:"flex", gap:6, marginBottom:4, fontSize:12, color:C.muted }}><span>▸</span>{s}</div>)}
-                </div>
+              <div style={{ display:"flex", flexDirection:"column", gap:3 }}>
+                {ph.items.map((item,i) => (
+                  <div key={i} style={{ display:"flex", gap:8, fontSize:12, color:C.text }}>
+                    <span style={{ color:ph.status==="done"?C.green:ph.status==="next"?C.amber:C.slate, flexShrink:0 }}>
+                      {ph.status==="done"?"✓":"○"}
+                    </span>
+                    {item}
+                  </div>
+                ))}
               </div>
+              {ph.stack && (
+                <div style={{ marginTop:10, paddingTop:10, borderTop:`1px solid ${C.border}`, display:"flex", gap:8, flexWrap:"wrap" }}>
+                  {ph.stack.map((s,i) => <Pill key={i} label={s} bg="#F1F5F9" color={C.muted} />)}
+                </div>
+              )}
             </Card>
           );
         })}
       </div>
-      <div style={{ marginTop:16, background:"#F0FDF4", border:"1px solid #BBF7D0", borderRadius:10, padding:"14px 18px" }}>
-        <div style={{ fontSize:13, fontWeight:600, color:C.green, marginBottom:5 }}>Unit Economics</div>
-        <div style={{ fontSize:12, color:"#14532D" }}>At the Growth plan ($149/month per firm), infra cost per firm at 100 customers is ~$1–2/month. Gross margin on infrastructure exceeds 98%. <strong>The business risk is product-market fit, not infrastructure cost.</strong></div>
+
+      <div style={{ marginTop:16, background:"#F0F9FF", border:"1px solid #BAE6FD", borderRadius:10, padding:"14px 18px" }}>
+        <div style={{ fontSize:13, fontWeight:600, color:"#0369A1", marginBottom:5 }}>Unit economics at scale</div>
+        <div style={{ fontSize:12, color:"#0C4A6E" }}>
+          At Growth plan ($149 CAD/month per firm), infra cost at 100 firms is ~$1–2/month per firm. Gross margin on infrastructure exceeds 98%. The business risk is product-market fit, not infrastructure cost.
+        </div>
       </div>
     </div>
   );
 }
-
 // ─── WHY US ───────────────────────────────────────────────────────────────────
 function WhyUsPage() {
   const rows = [
-    { feature:"Canada-first CRA deadlines",   uku:"Manual setup",   taxt:"Generic",      us:"Native · built in" },
-    { feature:"Workflow intelligence",         uku:"Linear tasks",   taxt:"Linear tasks", us:"Decision-aware branching" },
-    { feature:"At Risk algorithm",             uku:"Simple overdue", taxt:"Basic flag",   us:"5-condition predictive per workflow" },
-    { feature:"Gate enforcement",              uku:"None",           taxt:"None",         us:"Hard stops with reasons" },
-    { feature:"Document reminders",            uku:"Manual",         taxt:"Basic",        us:"Automated escalation sequence" },
-    { feature:"Setup time for first workflow", uku:"Days",           taxt:"Hours",        us:"Minutes (prebuilt)" },
-    { feature:"Sole prop branching logic",     uku:"No",             taxt:"No",           us:"Yes (simplified checklist)" },
-    { feature:"Pricing for Ontario firms",     uku:"$49+ USD/user",  taxt:"$99+ USD/user",us:"Flat CAD, firm pricing" },
+    { feature:"Canada-first CRA deadlines",           uku:"Manual setup",          taxt:"Generic calendar",     us:"Native — GST monthly/quarterly/annual, T1, T2, Payroll built in" },
+    { feature:"Workflow engine",                       uku:"Linear task lists",     taxt:"Linear task lists",    us:"6-stage engine: gate enforcement, branching by client type, auto-advance" },
+    { feature:"At Risk algorithm",                     uku:"Simple overdue flag",   taxt:"Basic flag",           us:"5-condition predictive engine per workflow (C1–C5), computed in real time" },
+    { feature:"Stage gate enforcement",                uku:"None",                  taxt:"None",                 us:"Hard stops with specific reasons — Stage 3 locked until docs received" },
+    { feature:"Document request & escalation",         uku:"Manual email",          taxt:"Basic reminders",      us:"Automated Resend emails — Reminder #1, Reminder #2 + owner escalation" },
+    { feature:"Multi-workflow per client",             uku:"One workflow",          taxt:"One workflow",         us:"GST + T2 + Payroll simultaneously — worst status aggregated to client" },
+    { feature:"Corporation vs sole prop branching",    uku:"No",                    taxt:"No",                   us:"ITC reconciliation, dual review gate, simplified checklist — auto-applied" },
+    { feature:"Team roles (owner/senior/accountant)",  uku:"Basic roles",           taxt:"Basic roles",          us:"Role-gated stage approvals — Stage 4 requires senior or owner" },
+    { feature:"Client portal for doc upload",          uku:"Email only",            taxt:"Email only",           us:"Portal tokens — client uploads directly, marks document received in DB" },
+    { feature:"QBO / Zoho integration",                uku:"Manual",               taxt:"QBO only",             us:"QBO + Zoho OAuth — bookkeeping auto-advances Stage 1 gate" },
+    { feature:"Pricing for Canadian firms",            uku:"$49+ USD per user",     taxt:"$99+ USD per user",    us:"Flat CAD firm pricing — $49/$149/$299 — no per-user fees" },
+    { feature:"Setup time",                            uku:"Days of configuration", taxt:"Hours",                us:"Add client → select workflow type → template applied in seconds" },
   ];
+
+  const FIVE_DASHBOARDS = [
+    { icon:"⊞", name:"Command Centre",      desc:"Risk-sorted client ledger. At Risk, Overdue, On Track tiles. Top 3 spotlights. Workflow type filter tabs." },
+    { icon:"👥", name:"Clients",             desc:"All clients with status badges, filter by status, search. Each row shows workflow pills, stage progress, days to deadline." },
+    { icon:"⚡", name:"All Workflows",       desc:"Every engagement across all clients, sorted by deadline. Cross-client view for workflow type or period." },
+    { icon:"📅", name:"Deadlines",           desc:"CRA deadline calendar grouped by urgency — Overdue, At Risk (≤7d), Upcoming (≤30d). Built-in Canadian CRA rules." },
+    { icon:"🗂", name:"Templates",           desc:"GST/HST workflow template with stage-by-stage gate rules. T1, T2, Payroll, Bookkeeping coming in ongoing development." },
+  ];
+
+  const CLIENT_DETAIL_TABS = [
+    { name:"Workflow",    desc:"6-stage timeline with gate banners, action footers, stage advancement. CRA confirmation number input for Stage 6." },
+    { name:"Tasks",       desc:"Stage-grouped task list with progress bars, gate enforcement (locked if previous stage incomplete), checkbox to mark complete → writes to DB." },
+    { name:"Documents",   desc:"Document checklist by client type, file upload, Mark Received, Send Request modal with email preview." },
+    { name:"Activity",    desc:"Live audit feed from events table — who did what and when, auto-advance logs, stage completions." },
+    { name:"Integration", desc:"QBO / Zoho Books connection status per client. Connect button initiates OAuth flow." },
+  ];
+
   return (
     <div>
-      <SectionHead title="Why Us vs Uku / TaxDome" sub="Use this in every sales conversation and demo" />
-      <div style={{ background:"#F0FDF4", border:"1px solid #BBF7D0", borderRadius:10, padding:"14px 18px", marginBottom:20 }}>
-        <div style={{ fontSize:13, fontWeight:600, color:C.green, marginBottom:6 }}>Positioning Statement</div>
-        <div style={{ fontSize:13, color:"#14532D", fontStyle:"italic" }}>"Uku and TaxDome are good products built for large markets. We're built specifically for Canadian accounting firms — CRA deadlines are native, GST workflows are prebuilt, and the system tells you what's at risk before it becomes a problem. You're live in an afternoon, not a week."</div>
+      <SectionHead title="Why AcctOS" sub="Built specifically for Canadian accounting firms" />
+
+      {/* Core hook */}
+      <div style={{ background:"#F0FDF4", border:"1px solid #BBF7D0", borderRadius:10, padding:"16px 20px", marginBottom:16 }}>
+        <div style={{ fontSize:13, fontWeight:600, color:C.green, marginBottom:6 }}>The core insight</div>
+        <div style={{ fontSize:13, color:"#14532D", fontStyle:"italic", marginBottom:8 }}>
+          "Most firms don't miss CRA deadlines because they don't care — they miss them because they lose track. We don't track work. We predict risk."
+        </div>
+        <div style={{ fontSize:12, color:"#15803D" }}>
+          One avoided CRA penalty covers roughly a month of the Growth plan. That's the conversation every sales call starts with.
+        </div>
       </div>
-      <div style={{ background:"#FFF7ED", border:"1px solid #FED7AA", borderRadius:10, padding:"14px 18px", marginBottom:20 }}>
-        <div style={{ fontSize:13, fontWeight:600, color:C.amber, marginBottom:6 }}>Core Emotional Hook</div>
-        <div style={{ fontSize:13, color:"#7C2D12", fontStyle:"italic", marginBottom:4 }}>"Most firms don't miss deadlines because they don't care — they miss them because they lose track."</div>
-        <div style={{ fontSize:13, color:"#7C2D12", fontStyle:"italic" }}>"We don't track work. We predict risk."</div>
+
+      {/* 5 dashboards */}
+      <div style={{ fontSize:13, fontWeight:600, color:C.text, marginBottom:10 }}>The 5 views</div>
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:20 }}>
+        {FIVE_DASHBOARDS.map(d => (
+          <div key={d.name} style={{ background:"white", border:`1px solid ${C.border}`, borderRadius:8, padding:"12px 14px" }}>
+            <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:4 }}>
+              <span style={{ fontSize:14 }}>{d.icon}</span>
+              <span style={{ fontSize:13, fontWeight:600, color:C.text }}>{d.name}</span>
+            </div>
+            <div style={{ fontSize:12, color:C.muted }}>{d.desc}</div>
+          </div>
+        ))}
+        <div style={{ background:"white", border:`1px solid ${C.border}`, borderRadius:8, padding:"12px 14px" }}>
+          <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:4 }}>
+            <span style={{ fontSize:14 }}>🏢</span>
+            <span style={{ fontSize:13, fontWeight:600, color:C.text }}>Client Detail</span>
+          </div>
+          <div style={{ fontSize:12, color:C.muted }}>5 tabs: Workflow · Tasks · Documents · Activity · Integration — everything about one client in one place.</div>
+        </div>
       </div>
+
+      {/* Client detail tabs */}
+      <div style={{ fontSize:13, fontWeight:600, color:C.text, marginBottom:10 }}>Client detail — 5 tabs</div>
+      <div style={{ display:"flex", flexDirection:"column", gap:6, marginBottom:20 }}>
+        {CLIENT_DETAIL_TABS.map((t,i) => (
+          <div key={t.name} style={{ display:"flex", gap:12, alignItems:"flex-start", background:"white", border:`1px solid ${C.border}`, borderRadius:8, padding:"10px 14px" }}>
+            <div style={{ width:22, height:22, borderRadius:"50%", background:C.primaryBg, color:C.primary, fontSize:11, fontWeight:700, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>{i+1}</div>
+            <div>
+              <div style={{ fontSize:13, fontWeight:600, color:C.text }}>{t.name}</div>
+              <div style={{ fontSize:12, color:C.muted }}>{t.desc}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Workflow types */}
+      <div style={{ fontSize:13, fontWeight:600, color:C.text, marginBottom:10 }}>Supported filing types</div>
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:8, marginBottom:20 }}>
+        {[
+          ["GST/HST","Monthly / Quarterly / Annual","Live — full template, gate engine, branching"],
+          ["T2 Corporate","Annual (year-end based)","Template built, UI available"],
+          ["T1 Personal","Annual (Jan–Apr peak)","Template built, highest volume"],
+          ["Payroll","Monthly / bi-weekly","Penalty-sensitive remittances"],
+          ["Bookkeeping","Monthly","Links to auto-advance GST Stage 1"],
+          ["CRA Notices","Event-based","Deadline response tracking"],
+        ].map(([type, freq, status]) => (
+          <div key={type} style={{ background:"white", border:`1px solid ${C.border}`, borderRadius:8, padding:"11px 14px" }}>
+            <div style={{ fontSize:13, fontWeight:600, color:C.text }}>{type}</div>
+            <div style={{ fontSize:11, color:C.muted, margin:"2px 0 4px" }}>{freq}</div>
+            <div style={{ fontSize:11, color:C.green }}>{status}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Competitor comparison */}
+      <div style={{ fontSize:13, fontWeight:600, color:C.text, marginBottom:10 }}>vs. Uku and TaxDome</div>
       <Card style={{ overflow:"hidden", marginBottom:20 }}>
         <table style={{ width:"100%", borderCollapse:"collapse" }}>
           <thead>
             <tr style={{ background:"#F8FAFC" }}>
               {["Feature","Uku","TaxDome","AcctOS"].map((h,i) => (
-                <th key={h} style={{ padding:"10px 16px", textAlign:"left", fontSize:11, fontWeight:600, color:i===3?C.primary:C.muted, textTransform:"uppercase", letterSpacing:"0.05em", borderBottom:`1px solid ${C.border}` }}>{h}</th>
+                <th key={h} style={{ padding:"9px 14px", textAlign:"left", fontSize:11, fontWeight:600, color:i===3?C.primary:C.muted, textTransform:"uppercase", letterSpacing:"0.05em", borderBottom:`1px solid ${C.border}` }}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {rows.map((r,i) => (
               <tr key={i} style={{ background:i%2===0?"white":"#FAFAFA" }}>
-                <td style={{ padding:"10px 16px", fontSize:13, fontWeight:500, color:C.text }}>{r.feature}</td>
-                <td style={{ padding:"10px 16px", fontSize:13, color:C.muted }}>{r.uku}</td>
-                <td style={{ padding:"10px 16px", fontSize:13, color:C.muted }}>{r.taxt}</td>
-                <td style={{ padding:"10px 16px", fontSize:13, color:C.green, fontWeight:600 }}>✓ {r.us}</td>
+                <td style={{ padding:"9px 14px", fontSize:12, fontWeight:500, color:C.text }}>{r.feature}</td>
+                <td style={{ padding:"9px 14px", fontSize:12, color:C.muted }}>{r.uku}</td>
+                <td style={{ padding:"9px 14px", fontSize:12, color:C.muted }}>{r.taxt}</td>
+                <td style={{ padding:"9px 14px", fontSize:12, color:C.green, fontWeight:500 }}>✓ {r.us}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </Card>
-      <div style={{ fontSize:13, fontWeight:600, color:C.text, marginBottom:10 }}>Demo Script — 5 Steps</div>
+
+      {/* Demo script */}
+      <div style={{ fontSize:13, fontWeight:600, color:C.text, marginBottom:10 }}>Demo script — 8 minutes</div>
       {[
-        ["Dashboard","Here are your clients this month. One on track, one at risk, one overdue. You see it all in one place the moment you log in."],
-        ["Sunrise Bakery (At Risk)","Documents still missing, reminder sent twice. Open the client — you can see the hard stop right on the stage. It literally says 'this cannot proceed'. The system flagged it — you didn't have to notice yourself."],
-        ["Patel & Sons (Overdue)","This one was missed. Open it — the filing stage shows 'Missed' with a penalty risk banner. You can act today instead of finding out at year-end."],
-        ["Maple Contracting (On Track)","This one is fine. Bookkeeping done, docs in, prep underway. Nothing for you to do."],
-        ["Workflow Intelligence","Corporation? ITC reconciliation added automatically. GST > $10k? Dual review gate. Refund? Justification required. It's not a to-do list — it knows the rules and it enforces them."],
-      ].map(([step,line],i) => (
+        ["Command Centre","Show risk tiles: 1 overdue, 1 at risk, 3 on track. Point to spotlight cards — they know exactly what needs action today without clicking anything."],
+        ["At Risk client (Sunrise Bakery)","Open it. Stage 2 shows HARD STOP — 3 documents pending, Stage 3 is locked. The system flagged it. They didn't have to notice."],
+        ["Overdue client (Patel & Sons)","Stage 5 shows Missed with 'file immediately'. Penalty risk banner. They act today instead of finding out at year-end."],
+        ["On Track client (Maple Contracting)","All stages green. Tasks in progress. Nothing to do — it's fine. That's the point."],
+        ["Add a new client","Click + Add Client. Two steps: client info → workflow type. Stages, tasks, and document checklist appear automatically. No setup."],
+        ["Tasks tab — stage gating","Open Tasks on any client. Stage 3 is locked until Stage 2 docs are in. The system enforces the rules so accountants don't skip steps."],
+        ["Send Request","Go to Documents. Click Send Request. They see exactly what email will go out before it sends. Reminder #2 auto-escalates to the owner."],
+        ["Settings → Team","Show role assignment. Owner, Senior CPA, Accountant, Admin — each role controls different stage approvals. One invite sends an email."],
+      ].map(([step, line], i) => (
         <div key={i} style={{ display:"flex", gap:12, marginBottom:12 }}>
           <div style={{ width:24, height:24, borderRadius:"50%", background:C.primaryBg, color:C.primary, fontSize:11, fontWeight:700, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>{i+1}</div>
           <div>
             <div style={{ fontSize:13, fontWeight:600, color:C.text }}>{step}</div>
-            <div style={{ fontSize:13, color:C.muted, fontStyle:"italic", marginTop:2 }}>"{line}"</div>
+            <div style={{ fontSize:12, color:C.muted, fontStyle:"italic", marginTop:2 }}>"{line}"</div>
           </div>
         </div>
       ))}
     </div>
   );
 }
-
 // ─── SETTINGS ────────────────────────────────────────────────────────────────
 function SettingsPage() {
-  const [plan, setPlan] = useState("Growth");
-  const [rules, setRules] = useState({ autoCreate:true, docReminder:true, escalate:true, deadlineAlert:true, overdueFlag:true });
-  const toggle = k => setRules(r => ({...r,[k]:!r[k]}));
+  const [activeTab, setActiveTab] = useState("firm");
+
+  // ── Firm profile state ───────────────────────────────────────────────────────
+  const [firm, setFirm]       = useState({ name:"", email:"", province:"Ontario", bn:"" });
+  const [firmSaving, setFirmSaving] = useState(false);
+  const [firmMsg, setFirmMsg] = useState(null);
+
+  // ── Automation rules state ───────────────────────────────────────────────────
+  const [rules, setRules]       = useState({ auto_create_workflows:true, doc_reminder_day3:true, escalate_on_reminder2:true, deadline_alert_3d:true, overdue_flag:true });
+  const [rulesSaving, setRulesSaving] = useState(false);
+  const [rulesMsg, setRulesMsg] = useState(null);
+
+  // ── Users/team state ─────────────────────────────────────────────────────────
+  const [users, setUsers]         = useState([]);
+  const [invitations, setInvitations] = useState([]);
+  const [usersLoading, setUsersLoading] = useState(true);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole]   = useState("accountant");
+  const [inviteSending, setInviteSending] = useState(false);
+  const [inviteMsg, setInviteMsg]     = useState(null);
+  const [roleChanging, setRoleChanging] = useState(null);
+
+  // ── Load settings on mount ───────────────────────────────────────────────────
+  useEffect(() => {
+    // Load firm settings
+    fetch("/api/settings", { credentials:"include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(json => {
+        if (json?.firm) setFirm(f => ({...f, ...json.firm}));
+        if (json?.rules) setRules(r => ({...r, ...json.rules}));
+      }).catch(()=>{});
+
+    // Load users
+    fetch("/api/users", { credentials:"include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(json => {
+        if (json?.data) setUsers(json.data);
+        if (json?.pending_invitations) setInvitations(json.pending_invitations);
+      }).catch(()=>{})
+      .finally(() => setUsersLoading(false));
+  }, []);
+
+  async function saveFirm() {
+    setFirmSaving(true); setFirmMsg(null);
+    try {
+      const res = await fetch("/api/settings", {
+        method:"PATCH", credentials:"include",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ firm }),
+      });
+      const data = await res.json();
+      setFirmMsg(res.ok ? { ok:true, text:"Saved." } : { ok:false, text:data.error || "Failed." });
+    } catch(e) { setFirmMsg({ ok:false, text:"Network error." }); }
+    finally { setFirmSaving(false); }
+  }
+
+  async function saveRules() {
+    setRulesSaving(true); setRulesMsg(null);
+    try {
+      const res = await fetch("/api/settings", {
+        method:"PATCH", credentials:"include",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ rules }),
+      });
+      const data = await res.json();
+      setRulesMsg(res.ok ? { ok:true, text:"Saved." } : { ok:false, text:data.error || "Failed." });
+    } catch(e) { setRulesMsg({ ok:false, text:"Network error." }); }
+    finally { setRulesSaving(false); }
+  }
+
+  async function sendInvite() {
+    if (!inviteEmail.trim()) return;
+    setInviteSending(true); setInviteMsg(null);
+    try {
+      const res = await fetch("/api/users/invite", {
+        method:"POST", credentials:"include",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ email: inviteEmail.trim(), role: inviteRole }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setInviteMsg({ ok:true, text:`Invite sent to ${inviteEmail}.` });
+        setInviteEmail("");
+        setInvitations(prev => [data, ...prev]);
+      } else {
+        setInviteMsg({ ok:false, text:data.error || "Failed." });
+      }
+    } catch(e) { setInviteMsg({ ok:false, text:"Network error." }); }
+    finally { setInviteSending(false); }
+  }
+
+  async function changeRole(userId, newRole) {
+    setRoleChanging(userId);
+    try {
+      const res = await fetch(`/api/users/${userId}`, {
+        method:"PATCH", credentials:"include",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ role: newRole }),
+      });
+      if (res.ok) {
+        setUsers(prev => prev.map(u => u.id === userId ? {...u, role: newRole} : u));
+      }
+    } finally { setRoleChanging(null); }
+  }
+
+  const ROLE_LABELS = {
+    owner:              "Owner",
+    senior_accountant:  "Senior CPA",
+    accountant:         "Accountant",
+    admin:              "Admin",
+  };
+  const ROLE_COLORS = {
+    owner:             [C.primaryBg, C.primary],
+    senior_accountant: [C.greenBg, C.green],
+    accountant:        ["#F1F5F9", C.muted],
+    admin:             [C.amberBg, C.amber],
+  };
+
+  const tabs = ["firm","team","automation","billing"];
+  const tabLabels = { firm:"Firm Profile", team:"Team & Roles", automation:"Automation", billing:"Billing" };
+
   return (
     <div>
-      <SectionHead title="Settings" sub="Firm profile, billing, and automation preferences" />
-      {[
-        { title:"Firm Profile", content:(
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14 }}>
-            {[["Firm Name","Jensen & Associates CPA"],["Primary Email","mark@jensenaccounting.ca"],["Province","Ontario, Canada"],["CRA Business Number","123456789 RT0001"]].map(([l,v]) => (
-              <div key={l}>
-                <label style={{ display:"block", fontSize:11, fontWeight:600, color:C.muted, marginBottom:5, textTransform:"uppercase", letterSpacing:"0.05em" }}>{l}</label>
-                <input defaultValue={v} style={{ width:"100%", padding:"8px 12px", borderRadius:8, border:`1px solid ${C.border}`, fontSize:13, color:C.text, boxSizing:"border-box", outline:"none" }} />
+      <SectionHead title="Settings" sub="Firm profile, team, and automation preferences" />
+
+      {/* Tab bar */}
+      <div style={{ display:"flex", borderBottom:`1px solid ${C.border}`, marginBottom:20 }}>
+        {tabs.map(t => (
+          <button key={t} onClick={() => setActiveTab(t)}
+            style={{ background:"none", border:"none", borderBottom:activeTab===t?`2px solid ${C.primary}`:"2px solid transparent", padding:"8px 16px", cursor:"pointer", fontSize:13, fontWeight:activeTab===t?600:400, color:activeTab===t?C.primary:C.muted }}>
+            {tabLabels[t]}
+          </button>
+        ))}
+      </div>
+
+      {/* ── FIRM PROFILE ── */}
+      {activeTab==="firm" && (
+        <Card style={{ padding:"20px 24px" }}>
+          <div style={{ fontSize:14, fontWeight:600, color:C.text, marginBottom:16 }}>Firm Profile</div>
+          {firmMsg && <div style={{ background:firmMsg.ok?C.greenBg:C.redBg, border:`1px solid ${firmMsg.ok?"#BBF7D0":"#FCA5A5"}`, borderRadius:8, padding:"8px 12px", fontSize:12, color:firmMsg.ok?"#14532D":C.red, marginBottom:14 }}>{firmMsg.text}</div>}
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14, marginBottom:16 }}>
+            {[
+              ["Firm Name","name","text"],
+              ["Primary Email","email","email"],
+              ["Province","province","text"],
+              ["CRA Business Number","bn","text"],
+            ].map(([label,key,type]) => (
+              <div key={key}>
+                <label style={{ display:"block", fontSize:11, fontWeight:600, color:C.muted, marginBottom:5, textTransform:"uppercase", letterSpacing:"0.05em" }}>{label}</label>
+                <input type={type} value={firm[key]||""} onChange={e => setFirm(f => ({...f,[key]:e.target.value}))}
+                  style={{ width:"100%", padding:"8px 12px", borderRadius:8, border:`1px solid ${C.border}`, fontSize:13, color:C.text, boxSizing:"border-box", outline:"none" }} />
               </div>
             ))}
           </div>
-        )},
-        { title:"Billing Plan", content:(
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:12 }}>
-            {[["Starter","$49/mo","50 clients","2 users",false],["Growth","$149/mo","150 clients","5 users",true],["Scale","$299/mo","Unlimited","Unlimited",false]].map(([name,price,clients,users,rec]) => (
-              <div key={name} onClick={() => setPlan(name)} style={{ border:`2px solid ${plan===name?C.primary:C.border}`, borderRadius:10, padding:"14px", cursor:"pointer", background:plan===name?C.primaryBg:"white" }}>
-                <div style={{ fontSize:14, fontWeight:700, color:plan===name?C.primary:C.text }}>{name}</div>
-                <div style={{ fontSize:22, fontWeight:700, color:C.text, margin:"5px 0" }}>{price}</div>
-                <div style={{ fontSize:12, color:C.muted }}>{clients}</div>
-                <div style={{ fontSize:12, color:C.muted, marginBottom:rec?8:0 }}>{users}</div>
-                {rec && <Pill label="Recommended" bg={C.primaryBg} color={C.primary} />}
-              </div>
-            ))}
-          </div>
-        )},
-        { title:"Automation Rules", content:(
-          <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
-            {[["autoCreate","Auto-create workflows at billing cycle start"],["docReminder","Send document reminders after 3 days"],["escalate","Escalate to owner on Reminder #2"],["deadlineAlert","Deadline alerts 3 days before CRA due date"],["overdueFlag","Flag overdue clients on dashboard"]].map(([k,label]) => (
-              <div key={k} style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                <span style={{ fontSize:13, color:C.text }}>{label}</span>
-                <div onClick={() => toggle(k)} style={{ width:40, height:22, borderRadius:11, background:rules[k]?C.primary:C.border, cursor:"pointer", position:"relative" }}>
-                  <div style={{ width:16, height:16, borderRadius:"50%", background:"white", position:"absolute", top:3, left:rules[k]?21:3, transition:"left 0.15s" }} />
+          <button onClick={saveFirm} disabled={firmSaving}
+            style={{ background:C.primary, color:"white", border:"none", borderRadius:8, padding:"8px 18px", fontSize:13, fontWeight:600, cursor:firmSaving?"not-allowed":"pointer", opacity:firmSaving?0.7:1 }}>
+            {firmSaving ? "Saving…" : "Save Firm Profile"}
+          </button>
+        </Card>
+      )}
+
+      {/* ── TEAM & ROLES ── */}
+      {activeTab==="team" && (
+        <div>
+          {/* Current team */}
+          <Card style={{ marginBottom:14 }}>
+            <div style={{ padding:"14px 18px", borderBottom:`1px solid ${C.border}`, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+              <span style={{ fontSize:14, fontWeight:600, color:C.text }}>Team Members</span>
+              <span style={{ fontSize:11, color:C.muted }}>{users.length} users</span>
+            </div>
+            {usersLoading
+              ? <div style={{ padding:"20px", textAlign:"center", color:C.muted, fontSize:13 }}>Loading…</div>
+              : users.length === 0
+              ? <div style={{ padding:"20px", textAlign:"center", color:C.muted, fontSize:13 }}>No users found.</div>
+              : users.map((u, i) => {
+                const [rbg, rc] = ROLE_COLORS[u.role] || ["#F1F5F9", C.muted];
+                return (
+                  <div key={u.id} style={{ padding:"12px 18px", borderBottom:i<users.length-1?`1px solid ${C.border}`:"none", display:"flex", alignItems:"center", gap:12 }}>
+                    <Avatar name={u.name || u.email} size={34} />
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontSize:13, fontWeight:600, color:C.text }}>{u.name || "—"}</div>
+                      <div style={{ fontSize:11, color:C.muted }}>{u.email}</div>
+                    </div>
+                    <select value={u.role} onChange={e => changeRole(u.id, e.target.value)}
+                      disabled={roleChanging === u.id}
+                      style={{ padding:"5px 10px", borderRadius:8, border:`1px solid ${C.border}`, fontSize:12, fontWeight:600, color:rc, background:rbg, cursor:"pointer", outline:"none" }}>
+                      {Object.entries(ROLE_LABELS).map(([val, label]) => (
+                        <option key={val} value={val}>{label}</option>
+                      ))}
+                    </select>
+                    {roleChanging === u.id && <span style={{ fontSize:11, color:C.muted }}>Saving…</span>}
+                  </div>
+                );
+              })
+            }
+          </Card>
+
+          {/* Invite */}
+          <Card style={{ padding:"18px 20px", marginBottom:14 }}>
+            <div style={{ fontSize:14, fontWeight:600, color:C.text, marginBottom:14 }}>Invite Team Member</div>
+            {inviteMsg && <div style={{ background:inviteMsg.ok?C.greenBg:C.redBg, border:`1px solid ${inviteMsg.ok?"#BBF7D0":"#FCA5A5"}`, borderRadius:8, padding:"8px 12px", fontSize:12, color:inviteMsg.ok?"#14532D":C.red, marginBottom:12 }}>{inviteMsg.text}</div>}
+            <div style={{ display:"flex", gap:10 }}>
+              <input value={inviteEmail} onChange={e => setInviteEmail(e.target.value)}
+                placeholder="colleague@firm.ca"
+                style={{ flex:1, padding:"8px 12px", borderRadius:8, border:`1px solid ${C.border}`, fontSize:13, outline:"none" }} />
+              <select value={inviteRole} onChange={e => setInviteRole(e.target.value)}
+                style={{ padding:"8px 12px", borderRadius:8, border:`1px solid ${C.border}`, fontSize:13, outline:"none", background:"white" }}>
+                {Object.entries(ROLE_LABELS).filter(([v]) => v !== "owner").map(([val, label]) => (
+                  <option key={val} value={val}>{label}</option>
+                ))}
+              </select>
+              <button onClick={sendInvite} disabled={inviteSending || !inviteEmail.trim()}
+                style={{ background:C.primary, color:"white", border:"none", borderRadius:8, padding:"8px 16px", fontSize:13, fontWeight:600, cursor:inviteEmail.trim()&&!inviteSending?"pointer":"not-allowed", opacity:inviteSending?0.7:1, whiteSpace:"nowrap" }}>
+                {inviteSending ? "Sending…" : "Send Invite"}
+              </button>
+            </div>
+            <div style={{ fontSize:11, color:C.muted, marginTop:8 }}>They'll receive an email with a sign-up link. Link expires in 7 days.</div>
+          </Card>
+
+          {/* Pending invitations */}
+          {invitations.length > 0 && (
+            <Card style={{ padding:"18px 20px" }}>
+              <div style={{ fontSize:13, fontWeight:600, color:C.text, marginBottom:12 }}>Pending Invitations</div>
+              {invitations.map((inv, i) => (
+                <div key={inv.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"8px 0", borderBottom:i<invitations.length-1?`1px solid ${C.border}`:"none" }}>
+                  <div>
+                    <div style={{ fontSize:13, color:C.text }}>{inv.email}</div>
+                    <div style={{ fontSize:11, color:C.muted }}>Role: {ROLE_LABELS[inv.role] || inv.role} · Sent {new Date(inv.created_at).toLocaleDateString("en-CA",{month:"short",day:"numeric"})}</div>
+                  </div>
+                  <Pill label="Pending" bg={C.amberBg} color={C.amber} />
+                </div>
+              ))}
+            </Card>
+          )}
+        </div>
+      )}
+
+      {/* ── AUTOMATION ── */}
+      {activeTab==="automation" && (
+        <Card style={{ padding:"20px 24px" }}>
+          <div style={{ fontSize:14, fontWeight:600, color:C.text, marginBottom:16 }}>Automation Rules</div>
+          {rulesMsg && <div style={{ background:rulesMsg.ok?C.greenBg:C.redBg, border:`1px solid ${rulesMsg.ok?"#BBF7D0":"#FCA5A5"}`, borderRadius:8, padding:"8px 12px", fontSize:12, color:rulesMsg.ok?"#14532D":C.red, marginBottom:14 }}>{rulesMsg.text}</div>}
+          <div style={{ display:"flex", flexDirection:"column", gap:14, marginBottom:20 }}>
+            {[
+              ["auto_create_workflows",  "Auto-create workflows at billing cycle start",        "On the 1st of each month, new GST workflows are created automatically for monthly filers."],
+              ["doc_reminder_day3",      "Send document reminder after 3 days",                 "If documents are still pending 3 days after a workflow reaches Stage 2, Reminder #1 is sent."],
+              ["escalate_on_reminder2",  "Escalate to owner on Reminder #2",                    "When Reminder #2 is sent, the firm owner is CC'd automatically."],
+              ["deadline_alert_3d",      "Deadline alert 3 days before CRA due date",           "Assigned accountant is notified 3 days before the CRA deadline if workflow is not Complete."],
+              ["overdue_flag",           "Flag overdue clients on dashboard",                   "Clients past their CRA deadline with an incomplete workflow are flagged Overdue."],
+            ].map(([key, label, desc]) => (
+              <div key={key} style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:16 }}>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:13, fontWeight:500, color:C.text }}>{label}</div>
+                  <div style={{ fontSize:11, color:C.muted, marginTop:2 }}>{desc}</div>
+                </div>
+                <div onClick={() => setRules(r => ({...r,[key]:!r[key]}))}
+                  style={{ width:40, height:22, borderRadius:11, background:rules[key]?C.primary:C.border, cursor:"pointer", position:"relative", flexShrink:0, marginTop:2 }}>
+                  <div style={{ width:16, height:16, borderRadius:"50%", background:"white", position:"absolute", top:3, left:rules[key]?21:3, transition:"left 0.15s" }} />
                 </div>
               </div>
             ))}
           </div>
-        )},
-      ].map(s => (
-        <Card key={s.title} style={{ padding:"18px 20px", marginBottom:14 }}>
-          <div style={{ fontSize:14, fontWeight:600, color:C.text, marginBottom:14 }}>{s.title}</div>
-          {s.content}
+          <button onClick={saveRules} disabled={rulesSaving}
+            style={{ background:C.primary, color:"white", border:"none", borderRadius:8, padding:"8px 18px", fontSize:13, fontWeight:600, cursor:rulesSaving?"not-allowed":"pointer", opacity:rulesSaving?0.7:1 }}>
+            {rulesSaving ? "Saving…" : "Save Automation Rules"}
+          </button>
         </Card>
-      ))}
-      <Btn variant="primary">Save Changes</Btn>
+      )}
+
+      {/* ── BILLING ── */}
+      {activeTab==="billing" && (
+        <Card style={{ padding:"20px 24px" }}>
+          <div style={{ fontSize:14, fontWeight:600, color:C.text, marginBottom:16 }}>Billing Plan</div>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:12, marginBottom:16 }}>
+            {[
+              ["Starter","$49/mo","Up to 50 clients","2 users"],
+              ["Growth","$149/mo","Up to 150 clients","5 users"],
+              ["Scale","$299/mo","Unlimited clients","Unlimited users"],
+            ].map(([name,price,clients,users]) => (
+              <div key={name} style={{ border:`2px solid ${C.border}`, borderRadius:10, padding:"16px" }}>
+                <div style={{ fontSize:14, fontWeight:700, color:C.text }}>{name}</div>
+                <div style={{ fontSize:24, fontWeight:700, color:C.text, margin:"6px 0" }}>{price}</div>
+                <div style={{ fontSize:12, color:C.muted }}>{clients}</div>
+                <div style={{ fontSize:12, color:C.muted, marginBottom:12 }}>{users}</div>
+                <button onClick={() => fetch("/api/billing/checkout", { method:"POST", credentials:"include", headers:{"Content-Type":"application/json"}, body:JSON.stringify({plan:name.toLowerCase()}) }).then(r=>r.json()).then(d=>{ if(d.url) window.location.href=d.url; })}
+                  style={{ background:C.primary, color:"white", border:"none", borderRadius:8, padding:"7px 14px", fontSize:12, fontWeight:600, cursor:"pointer", width:"100%" }}>
+                  Manage Plan →
+                </button>
+              </div>
+            ))}
+          </div>
+          <div style={{ fontSize:11, color:C.muted }}>Billing is managed via Stripe. Click "Manage Plan" to update your subscription, view invoices, or cancel.</div>
+        </Card>
+      )}
     </div>
   );
 }
-
 // ─── APP SHELL ────────────────────────────────────────────────────────────────
 export default function App() {
   const [view, setView]         = useState("dashboard");
