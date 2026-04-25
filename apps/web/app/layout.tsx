@@ -1,18 +1,15 @@
-export const metadata = {
-  title: 'AcctOS',
-  description: 'Canadian accounting firm workflow management',
-}
+import type { Metadata } from "next";
+import "./globals.css";
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export const metadata: Metadata = {
+  title: "AcctOS — Workflow Intelligence for Canadian Accounting Firms",
+  description: "CRA deadlines native. 5-condition risk engine. Gate enforcement that prevents errors before they become penalties.",
+};
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body style={{ margin: 0, padding: 0 }}>
-        {children}
-      </body>
+      <body>{children}</body>
     </html>
-  )
+  );
 }

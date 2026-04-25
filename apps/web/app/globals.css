@@ -1,0 +1,101 @@
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Mono:wght@300;400;500&display=swap');
+
+/* ── Design tokens ─────────────────────────────────────── */
+:root {
+  /* Fonts */
+  --font-display:  'Syne', system-ui, sans-serif;
+  --font-body:     'DM Sans', system-ui, sans-serif;
+  --font-mono:     'DM Mono', 'Menlo', monospace;
+
+  /* Brand colours */
+  --color-bg:        #080C14;
+  --color-surface:   #0F1117;
+  --color-surface-2: #0F1729;
+  --color-border:    #1E293B;
+  --color-border-hi: #1E3A5F;
+
+  /* Text */
+  --color-text:      #F1F5F9;
+  --color-text-2:    #94A3B8;
+  --color-text-3:    #64748B;
+  --color-text-4:    #475569;
+  --color-text-5:    #334155;
+
+  /* Accent */
+  --color-blue:      #2563EB;
+  --color-blue-bg:   #0F1729;
+  --color-sky:       #38BDF8;
+  --color-green:     #4ADE80;
+  --color-green-bg:  #052E16;
+  --color-amber:     #FBBF24;
+  --color-amber-bg:  #1C1200;
+  --color-red:       #F87171;
+  --color-red-bg:    #2D0A0A;
+
+  /* Dashboard (light surface) — used in AccountingOS.jsx */
+  --dash-bg:         #F8FAFC;
+  --dash-card:       #FFFFFF;
+  --dash-border:     #E2E8F0;
+  --dash-text:       #1E293B;
+  --dash-muted:      #64748B;
+  --dash-primary:    #2563EB;
+}
+
+/* ── Reset ──────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-body);
+  background: var(--color-bg);
+  color: var(--color-text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Scrollbar ──────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--color-surface); }
+::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-text-4); }
+
+/* ── Focus ring ─────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--color-blue);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ── Input autofill fix ─────────────────────────────────── */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px #0F1117 inset;
+  -webkit-text-fill-color: #F1F5F9;
+  caret-color: #F1F5F9;
+}
+
+/* ── Login page animations ──────────────────────────────── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
+}
+
+.fade-up   { animation: fadeUp 0.5s ease both; }
+.fade-up-1 { animation: fadeUp 0.5s ease 0.1s both; }
+.fade-up-2 { animation: fadeUp 0.5s ease 0.2s both; }
+.fade-up-3 { animation: fadeUp 0.5s ease 0.3s both; }
+.fade-up-4 { animation: fadeUp 0.5s ease 0.4s both; }
+
+.pulse-dot { animation: pulse-dot 2s ease-in-out infinite; }

@@ -45,7 +45,7 @@ const PHASES = [
       "T183 gate — T1 Stage 5 hard-blocked until authorization form is uploaded",
     ],
     screen: (
-      <div style={{background:"#0F1117",borderRadius:10,padding:"14px",fontSize:11,fontFamily:"system-ui"}}>
+      <div style={{background:"#0F1117",borderRadius:10,padding:"14px",fontSize:11,fontFamily:"var(--font-body, 'DM Sans', system-ui)"}}>
         <div style={{color:"#94A3B8",marginBottom:10,fontWeight:600}}>Sunrise Bakery — GST/HST Q3</div>
         {[
           {n:1,name:"Bookkeeping",status:"complete",color:"#4ADE80"},
@@ -79,7 +79,7 @@ const PHASES = [
       "8 automation toggles — all configurable in Settings → Automation, saved to DB immediately",
     ],
     screen: (
-      <div style={{background:"#0F1117",borderRadius:10,padding:"14px",fontSize:11,fontFamily:"system-ui"}}>
+      <div style={{background:"#0F1117",borderRadius:10,padding:"14px",fontSize:11,fontFamily:"var(--font-body, 'DM Sans', system-ui)"}}>
         <div style={{color:"#94A3B8",marginBottom:10,fontWeight:600}}>Automation Rules</div>
         {[
           {label:"Doc reminder Day 3",on:true},
@@ -114,7 +114,7 @@ const PHASES = [
       "Time tracking — start/stop timer or manual log, billable minutes shown per workflow",
     ],
     screen: (
-      <div style={{background:"#0F1117",borderRadius:10,padding:"14px",fontSize:11,fontFamily:"system-ui"}}>
+      <div style={{background:"#0F1117",borderRadius:10,padding:"14px",fontSize:11,fontFamily:"var(--font-body, 'DM Sans', system-ui)"}}>
         <div style={{color:"#94A3B8",marginBottom:10,fontWeight:600}}>Integrations</div>
         {[
           {name:"QuickBooks Online",status:"Connected",detail:"Maple Contracting synced · 2h ago",color:"#4ADE80"},

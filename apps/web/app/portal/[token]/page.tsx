@@ -120,7 +120,7 @@ export default function PortalPage({ params }: { params: { token: string } }) {
 
   // ── Loading ──────────────────────────────────────────────────────────────────
   if (loading) return (
-    <div style={{ minHeight: '100vh', background: '#F8FAFC', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16, fontFamily: 'system-ui, sans-serif' }}>
+    <div style={{ minHeight: '100vh', background: '#F8FAFC', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16, fontFamily: "var(--font-body, 'DM Sans', system-ui, sans-serif)" }}>
       <div style={{ width: 36, height: 36, borderRadius: '50%', border: '3px solid #E2E8F0', borderTopColor: '#2563EB', animation: 'spin 0.8s linear infinite' }} />
       <p style={{ color: '#64748B', fontSize: 15, margin: 0 }}>Loading your portal…</p>
       <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
@@ -129,7 +129,7 @@ export default function PortalPage({ params }: { params: { token: string } }) {
 
   // ── Error ────────────────────────────────────────────────────────────────────
   if (error || !data) return (
-    <div style={{ minHeight: '100vh', background: '#F8FAFC', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'system-ui, sans-serif', padding: 16 }}>
+    <div style={{ minHeight: '100vh', background: '#F8FAFC', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "var(--font-body, 'DM Sans', system-ui, sans-serif)", padding: 16 }}>
       <div style={{ background: 'white', border: '1px solid #FCA5A5', borderRadius: 12, padding: '32px 40px', maxWidth: 440, textAlign: 'center' }}>
         <div style={{ fontSize: 36, marginBottom: 12 }}>⚠️</div>
         <h2 style={{ fontSize: 18, fontWeight: 600, color: '#1E293B', margin: '0 0 10px' }}>Link not valid</h2>
@@ -143,7 +143,7 @@ export default function PortalPage({ params }: { params: { token: string } }) {
   const allComplete  = data.pending_documents_count > 0 && totalPending === 0
 
   return (
-    <div style={{ minHeight: '100vh', background: '#F8FAFC', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+    <div style={{ minHeight: '100vh', background: '#F8FAFC', fontFamily: "var(--font-body, 'DM Sans', system-ui, sans-serif)" }}>
       <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
 
       {/* Header */}
