@@ -156,6 +156,32 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
     })
     .eq('id', workflow.id)
 
+  // ── Advance next stage to in_progress ──────────────────────
+  // The tasks route uses auto_advance_stage() Postgres fn for this.
+  // When advancing via the stage button directly (no tasks), we do it here.
+  if (status === 'complete' && stage.n < 6) {
+    const nextStage = (freshStages ?? []).find((s: any) => s.n === stage.n + 1)
+    if (nextStage && nextStage.status === 'pending' && !nextStage.blocked && !nextStage.missed) {
+      await supabase
+        .from('stages')
+        .update({ status: 'in_progress' })
+        .eq('id', nextStage.id)
+    }
+    // Also fire workflow_links in case this stage has a linked target
+    await supabase.rpc('fire_workflow_links', {
+      p_source_workflow_id: workflow.id,
+      p_source_stage_n:     stage.n,
+    })
+  }
+
+  // If Stage 6 just completed — mark workflow Complete
+  if (status === 'complete' && stage.n === 6) {
+    await supabase
+      .from('workflows')
+      .update({ computed_status: 'Complete' })
+      .eq('id', workflow.id)
+  }
+
   // Log event
   await supabase.from('events').insert({
     client_id:   workflow.client_id,
