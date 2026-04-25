@@ -50,7 +50,7 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
     .select(`
       *,
       stages ( * ),
-      documents ( id, status, reminder_count ),
+      documents ( id, status, reminder_count, is_t183 ),
       client:clients!workflows_client_id_fkey ( id, type, net_gst, risk_history, penalty_risk )
     `)
     .eq('id', stage.workflow_id)
@@ -92,6 +92,18 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
           error: 'Filing is blocked until Stage 4 review is approved.',
           code: 'GATE_BLOCKED',
           gate_reason: 'Stage 4 review must be complete before filing.',
+        }, { status: 409 })
+      }
+    }
+
+    // T1 Stage 5 — T183 authorization must be received before filing
+    if (stage.n === 5 && workflow.type === 'T1') {
+      const t183Doc = (workflow.documents ?? []).find((d: any) => d.is_t183)
+      if (t183Doc && t183Doc.status !== 'received') {
+        return NextResponse.json({
+          error: 'T183 client authorization form has not been received. The client must sign and upload the T183 before the return can be EFILEd.',
+          code: 'GATE_BLOCKED',
+          gate_reason: 'T183 authorization required — client must sign before EFILE.',
         }, { status: 409 })
       }
     }
@@ -156,32 +168,6 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
     })
     .eq('id', workflow.id)
 
-  // ── Advance next stage to in_progress ──────────────────────
-  // The tasks route uses auto_advance_stage() Postgres fn for this.
-  // When advancing via the stage button directly (no tasks), we do it here.
-  if (status === 'complete' && stage.n < 6) {
-    const nextStage = (freshStages ?? []).find((s: any) => s.n === stage.n + 1)
-    if (nextStage && nextStage.status === 'pending' && !nextStage.blocked && !nextStage.missed) {
-      await supabase
-        .from('stages')
-        .update({ status: 'in_progress' })
-        .eq('id', nextStage.id)
-    }
-    // Also fire workflow_links in case this stage has a linked target
-    await supabase.rpc('fire_workflow_links', {
-      p_source_workflow_id: workflow.id,
-      p_source_stage_n:     stage.n,
-    })
-  }
-
-  // If Stage 6 just completed — mark workflow Complete
-  if (status === 'complete' && stage.n === 6) {
-    await supabase
-      .from('workflows')
-      .update({ computed_status: 'Complete' })
-      .eq('id', workflow.id)
-  }
-
   // Log event
   await supabase.from('events').insert({
     client_id:   workflow.client_id,
@@ -191,6 +177,30 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
     action:      `Stage ${stage.n} — ${stage.name} marked ${status ?? 'updated'}`,
     detail:      note ?? null,
   })
+
+  // ── Auto-invoice on Stage 6 completion ──────────────────────────────────────
+  // Fire-and-forget: if invoice_on_completion = true and billing rate exists
+  if (status === 'complete' && stage.n === 6) {
+    supabase
+      .from('firm_settings')
+      .select('invoice_on_completion, billing_rates')
+      .eq('firm_id', workflow.firm_id)
+      .single()
+      .then(async ({ data: settings }) => {
+        if (!settings?.invoice_on_completion) return
+        const rates = (settings.billing_rates ?? {}) as Record<string, number>
+        const amountCents = rates[workflow.type ?? ''] ?? 0
+        if (amountCents <= 0) return
+
+        // Call invoice creation internally
+        await fetch(`${process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'}/api/invoices`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Cookie: `sb-access-token=${workflow.firm_id}` },
+          body: JSON.stringify({ workflow_id: workflow.id, amount_cents: amountCents }),
+        }).catch(() => null) // never block the response
+      })
+      .catch(() => null)
+  }
 
   return NextResponse.json({
     stage: updatedStage,

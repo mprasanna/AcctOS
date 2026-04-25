@@ -44,6 +44,7 @@ export interface DocTemplate {
   corp_only?: boolean
   sole_prop_only?: boolean
   partnership_only?: boolean
+  is_t183?: boolean
 }
 
 export interface WorkflowTemplate {
@@ -160,6 +161,7 @@ export const T1_TEMPLATE: WorkflowTemplate = {
   ],
   docs: {
     corporation: [
+      { name: 'T183 Authorization Form', is_t183: true },
       { name: 'T4 Slips' },
       { name: 'T5 Investment Income Slips' },
       { name: 'T3 Trust Income Slips' },
@@ -172,6 +174,7 @@ export const T1_TEMPLATE: WorkflowTemplate = {
       { name: 'Business Income Summary (if self-employed)' },
     ],
     sole_prop: [
+      { name: 'T183 Authorization Form', is_t183: true },
       { name: 'T4 Slips' },
       { name: 'T5 Investment Income Slips' },
       { name: 'RRSP Contribution Receipts' },
@@ -334,68 +337,6 @@ export const BOOKKEEPING_TEMPLATE: WorkflowTemplate = {
 }
 
 // ────────────────────────────────────────────────────────────
-// TEMPLATE REGISTRY — lookup by WorkflowType
-// ────────────────────────────────────────────────────────────
-
-export const TEMPLATES: Partial<Record<WorkflowType, WorkflowTemplate>> = {
-  'GST/HST':    GST_TEMPLATE,
-  'T1':         T1_TEMPLATE,
-  'T2':         T2_TEMPLATE,
-  'Bookkeeping': BOOKKEEPING_TEMPLATE,
-}
-
-// ────────────────────────────────────────────────────────────
-// TEMPLATE BUILDER
-// Resolves tasks and docs for a specific client type,
-// filtering out corp_only / sole_prop_only items.
-// Called by POST /api/workflows.
-// ────────────────────────────────────────────────────────────
-
-export function resolveTemplate(
-  type: WorkflowType,
-  clientType: ClientType,
-  cycleStart: Date
-) {
-  const template = TEMPLATES[type]
-  if (!template) return null
-
-  const isCorp     = clientType === 'Corporation'
-  const isSoleProp = clientType === 'Sole prop'
-
-  // Filter tasks for this client type
-  const tasks = template.tasks.filter(t => {
-    if (t.corp_only     && !isCorp)     return false
-    if (t.sole_prop_only && !isSoleProp) return false
-    return true
-  })
-
-  // Resolve due dates from cycle_start
-  const resolvedTasks = tasks.map(t => ({
-    ...t,
-    due_date: new Date(cycleStart.getTime() + t.due_offset_days * 86_400_000)
-      .toISOString()
-      .split('T')[0],
-  }))
-
-  // Resolve stage gate_labels for this client type
-  const stages = template.stages.map(s => ({
-    ...s,
-    gate_label: (isCorp && s.corp_gate_label)
-      ? s.corp_gate_label
-      : (isSoleProp && s.sole_prop_gate_label)
-        ? s.sole_prop_gate_label
-        : s.gate_label,
-  }))
-
-  // Doc checklist for this client type
-  const docs = isCorp
-    ? template.docs.corporation
-    : template.docs.sole_prop
-
-  return { stages, tasks: resolvedTasks, docs }
-}
-
-// ────────────────────────────────────────────────────────────
 // PAYROLL REMITTANCES — Phase 4
 // CRA payroll deadlines are penalty-sensitive.
 // Monthly AND bi-weekly cycle support.
@@ -467,4 +408,68 @@ export const PAYROLL_TEMPLATE: WorkflowTemplate = {
 
 // Register Payroll in the templates registry
 // (Mutating the existing TEMPLATES object — safe since it's module-level)
-;(TEMPLATES as any)['Payroll'] = PAYROLL_TEMPLATE
+
+
+// ────────────────────────────────────────────────────────────
+// TEMPLATE REGISTRY — lookup by WorkflowType
+// ────────────────────────────────────────────────────────────
+
+export const TEMPLATES: Partial<Record<WorkflowType, WorkflowTemplate>> = {
+  'GST/HST':     GST_TEMPLATE,
+  'T1':          T1_TEMPLATE,
+  'T2':          T2_TEMPLATE,
+  'Bookkeeping': BOOKKEEPING_TEMPLATE,
+  'Payroll':     PAYROLL_TEMPLATE,
+}
+
+// ────────────────────────────────────────────────────────────
+// TEMPLATE BUILDER
+// Resolves tasks and docs for a specific client type,
+// filtering out corp_only / sole_prop_only items.
+// Called by POST /api/workflows.
+// ────────────────────────────────────────────────────────────
+
+export function resolveTemplate(
+  type: WorkflowType,
+  clientType: ClientType,
+  cycleStart: Date
+) {
+  const template = TEMPLATES[type]
+  if (!template) return null
+
+  const isCorp     = clientType === 'Corporation'
+  const isSoleProp = clientType === 'Sole prop'
+
+  // Filter tasks for this client type
+  const tasks = template.tasks.filter(t => {
+    if (t.corp_only     && !isCorp)     return false
+    if (t.sole_prop_only && !isSoleProp) return false
+    return true
+  })
+
+  // Resolve due dates from cycle_start
+  const resolvedTasks = tasks.map(t => ({
+    ...t,
+    due_date: new Date(cycleStart.getTime() + t.due_offset_days * 86_400_000)
+      .toISOString()
+      .split('T')[0],
+  }))
+
+  // Resolve stage gate_labels for this client type
+  const stages = template.stages.map(s => ({
+    ...s,
+    gate_label: (isCorp && s.corp_gate_label)
+      ? s.corp_gate_label
+      : (isSoleProp && s.sole_prop_gate_label)
+        ? s.sole_prop_gate_label
+        : s.gate_label,
+  }))
+
+  // Doc checklist for this client type
+  const docs = isCorp
+    ? template.docs.corporation
+    : template.docs.sole_prop
+
+  return { stages, tasks: resolvedTasks, docs }
+}
+

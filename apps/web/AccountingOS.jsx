@@ -571,7 +571,7 @@ function Dashboard({ clients, onSelect, setView, onAddClient }) {
 
   return (
     <div>
-      <SectionHead title="Command Centre" sub={`${new Date().toLocaleDateString("en-CA",{month:"long",year:"numeric"})} · ${cnt.all} active clients · Canada (CRA)`}
+      <SectionHead title="Command Centre" sub={`${new Date().toLocaleDateString("en-CA",{month:"long",year:"numeric"})} · ${cnt.all} active clients · Ontario (CRA timezone)`}
         action={<>
           <button onClick={onAddClient}
             style={{ background:C.green, color:"white", border:"none", borderRadius:8, padding:"7px 14px", fontSize:13, fontWeight:600, cursor:"pointer" }}>
@@ -941,6 +941,214 @@ function WorkflowTab({ wf, wfComputed, client, stageCfg, onRefresh }) {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+
+// ─── TIME TRACKING TAB ────────────────────────────────────────────────────────
+function TimeTrackingTab({ wf, client }) {
+  const [entries, setEntries]         = useState([]);
+  const [loading, setLoading]         = useState(true);
+  const [runningEntry, setRunning]    = useState(null);
+  const [elapsed, setElapsed]         = useState(0);
+  const [showManual, setShowManual]   = useState(false);
+  const [manualMins, setManualMins]   = useState("");
+  const [manualNote, setManualNote]   = useState("");
+  const [saving, setSaving]           = useState(false);
+  const timerRef                       = useRef(null);
+
+  const wfId = wf?.id;
+
+  // Load entries
+  useEffect(() => {
+    if (!wfId) return;
+    setLoading(true);
+    fetch(`/api/time-entries?workflow_id=${wfId}`, { credentials:"include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(json => {
+        if (!json) return;
+        setEntries(json.data ?? []);
+        const running = (json.data ?? []).find(e => e.running);
+        setRunning(running ?? null);
+      })
+      .finally(() => setLoading(false));
+  }, [wfId]);
+
+  // Tick elapsed seconds for running timer
+  useEffect(() => {
+    if (!runningEntry) { clearInterval(timerRef.current); return; }
+    setElapsed(Math.round((Date.now() - new Date(runningEntry.started_at).getTime()) / 1000));
+    timerRef.current = setInterval(() => {
+      setElapsed(Math.round((Date.now() - new Date(runningEntry.started_at).getTime()) / 1000));
+    }, 1000);
+    return () => clearInterval(timerRef.current);
+  }, [runningEntry]);
+
+  async function startTimer() {
+    if (!wfId) return;
+    setSaving(true);
+    try {
+      const res  = await fetch("/api/time-entries", {
+        method:"POST", credentials:"include",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ action:"start", workflow_id: wfId, client_id: client?.id }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setRunning(data.data);
+        setEntries(prev => [{ ...data.data, running:true, computed_minutes:0 }, ...prev]);
+      }
+    } finally { setSaving(false); }
+  }
+
+  async function stopTimer() {
+    if (!runningEntry?.id) return;
+    setSaving(true);
+    try {
+      const res  = await fetch("/api/time-entries", {
+        method:"POST", credentials:"include",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ action:"stop", entry_id: runningEntry.id }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setRunning(null);
+        setElapsed(0);
+        setEntries(prev => prev.map(e => e.id === runningEntry.id
+          ? { ...e, running:false, stopped_at:data.data.stopped_at, computed_minutes: data.duration_minutes }
+          : e
+        ));
+      }
+    } finally { setSaving(false); }
+  }
+
+  async function logManual() {
+    const mins = parseInt(manualMins);
+    if (!mins || mins <= 0 || !wfId) return;
+    setSaving(true);
+    try {
+      const res  = await fetch("/api/time-entries", {
+        method:"POST", credentials:"include",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ action:"log", workflow_id: wfId, client_id: client?.id, duration_minutes: mins, note: manualNote }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setEntries(prev => [{ ...data.data, computed_minutes: mins, running:false }, ...prev]);
+        setManualMins(""); setManualNote(""); setShowManual(false);
+      }
+    } finally { setSaving(false); }
+  }
+
+  async function deleteEntry(id) {
+    await fetch(`/api/time-entries?entry_id=${id}`, { method:"DELETE", credentials:"include" });
+    setEntries(prev => prev.filter(e => e.id !== id));
+  }
+
+  const totalMins = entries.filter(e => e.billable !== false).reduce((s, e) => s + (e.computed_minutes ?? 0), 0);
+  const fmtTime = (s) => {
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+    return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}`;
+  };
+  const fmtMins = (m) => {
+    if (!m) return "0m";
+    const h = Math.floor(m / 60), rem = m % 60;
+    return h > 0 ? `${h}h ${rem}m` : `${rem}m`;
+  };
+
+  return (
+    <div>
+      {/* Header */}
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14 }}>
+        <div>
+          <div style={{ fontSize:13, fontWeight:600, color:C.text }}>Time Tracking</div>
+          <div style={{ fontSize:11, color:C.muted, marginTop:2 }}>Total billable: {fmtMins(totalMins)}</div>
+        </div>
+        <div style={{ display:"flex", gap:8 }}>
+          <button onClick={() => setShowManual(v=>!v)}
+            style={{ background:"none", border:`1px solid ${C.border}`, borderRadius:7, padding:"5px 12px", fontSize:12, color:C.muted, cursor:"pointer" }}>
+            + Manual
+          </button>
+          {!runningEntry
+            ? <button onClick={startTimer} disabled={saving}
+                style={{ background:C.primary, color:"white", border:"none", borderRadius:7, padding:"6px 14px", fontSize:13, fontWeight:600, cursor:"pointer" }}>
+                ▶ Start Timer
+              </button>
+            : <button onClick={stopTimer} disabled={saving}
+                style={{ background:C.red, color:"white", border:"none", borderRadius:7, padding:"6px 14px", fontSize:13, fontWeight:600, cursor:"pointer", minWidth:140 }}>
+                ⏹ Stop — {fmtTime(elapsed)}
+              </button>
+          }
+        </div>
+      </div>
+
+      {/* Running timer banner */}
+      {runningEntry && (
+        <div style={{ background:C.amberBg, border:"1px solid #FCD34D", borderRadius:8, padding:"9px 14px", marginBottom:12, display:"flex", alignItems:"center", gap:10 }}>
+          <span style={{ fontSize:20 }}>⏱</span>
+          <div>
+            <div style={{ fontSize:13, fontWeight:600, color:C.amber }}>Timer running — {fmtTime(elapsed)}</div>
+            <div style={{ fontSize:11, color:C.muted }}>Started {new Date(runningEntry.started_at).toLocaleTimeString("en-CA",{hour:"2-digit",minute:"2-digit"})}</div>
+          </div>
+        </div>
+      )}
+
+      {/* Manual entry form */}
+      {showManual && (
+        <Card style={{ padding:"14px 16px", marginBottom:12, background:"#F8FAFC" }}>
+          <div style={{ fontSize:12, fontWeight:600, color:C.text, marginBottom:10 }}>Log time manually</div>
+          <div style={{ display:"flex", gap:8, marginBottom:8 }}>
+            <input type="number" min="1" placeholder="Minutes" value={manualMins}
+              onChange={e => setManualMins(e.target.value)}
+              style={{ width:90, padding:"6px 10px", borderRadius:7, border:`1px solid ${C.border}`, fontSize:13 }} />
+            <input type="text" placeholder="Note (optional)" value={manualNote}
+              onChange={e => setManualNote(e.target.value)}
+              style={{ flex:1, padding:"6px 10px", borderRadius:7, border:`1px solid ${C.border}`, fontSize:13 }} />
+          </div>
+          <div style={{ display:"flex", gap:8 }}>
+            <button onClick={logManual} disabled={!manualMins || saving}
+              style={{ background:C.primary, color:"white", border:"none", borderRadius:7, padding:"6px 14px", fontSize:13, fontWeight:600, cursor:"pointer" }}>
+              Log {manualMins ? fmtMins(parseInt(manualMins)) : ""}
+            </button>
+            <button onClick={() => setShowManual(false)}
+              style={{ background:"none", border:`1px solid ${C.border}`, borderRadius:7, padding:"6px 12px", fontSize:12, color:C.muted, cursor:"pointer" }}>
+              Cancel
+            </button>
+          </div>
+        </Card>
+      )}
+
+      {/* Entries list */}
+      {loading ? (
+        <div style={{ textAlign:"center", padding:20, color:C.muted, fontSize:13 }}>Loading…</div>
+      ) : entries.length === 0 ? (
+        <div style={{ textAlign:"center", padding:24, color:C.muted }}>
+          <div style={{ fontSize:28, marginBottom:8 }}>⏱</div>
+          <div style={{ fontSize:13 }}>No time logged yet. Start a timer or log manually.</div>
+        </div>
+      ) : (
+        <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+          {entries.map(e => (
+            <div key={e.id} style={{ background:e.running?"#FFFBEB":"white", border:`1px solid ${e.running?"#FCD34D":C.border}`, borderRadius:8, padding:"10px 14px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+              <div>
+                <div style={{ fontSize:13, fontWeight:500, color:C.text }}>
+                  {e.running ? `⏱ Running — ${fmtTime(elapsed)}` : fmtMins(e.computed_minutes)}
+                  {!e.billable && <span style={{ marginLeft:8, fontSize:11, color:C.muted }}>(non-billable)</span>}
+                </div>
+                {e.note && <div style={{ fontSize:11, color:C.muted, marginTop:2 }}>{e.note}</div>}
+                <div style={{ fontSize:11, color:C.slate, marginTop:2 }}>
+                  {e.user?.name} · {new Date(e.created_at).toLocaleDateString("en-CA",{month:"short",day:"numeric"})}
+                </div>
+              </div>
+              {!e.running && (
+                <button onClick={() => deleteEntry(e.id)}
+                  style={{ background:"none", border:"none", color:C.muted, cursor:"pointer", fontSize:16, padding:"2px 6px" }}>×</button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -1459,6 +1667,103 @@ function ActivityTab({ clientId }) {
 }
 
 
+
+// ─── INVOICES TAB ─────────────────────────────────────────────────────────────
+function InvoicesTab({ wf, client }) {
+  const [invoices, setInvoices]   = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [creating, setCreating]   = useState(false);
+  const [override, setOverride]   = useState("");
+  const [error, setError]         = useState(null);
+  const [success, setSuccess]     = useState(null);
+
+  useEffect(() => {
+    if (!wf?.id) return;
+    fetch(`/api/invoices?workflow_id=${wf.id}`, { credentials:"include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(json => { if (json?.data) setInvoices(json.data); })
+      .finally(() => setLoading(false));
+  }, [wf?.id]);
+
+  async function createInvoice() {
+    setCreating(true); setError(null); setSuccess(null);
+    try {
+      const body = { workflow_id: wf.id };
+      if (override) body.override_amount = Math.round(parseFloat(override) * 100);
+      const res  = await fetch("/api/invoices", {
+        method:"POST", credentials:"include",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSuccess(`Invoice created — $${((data.amount_cents||0)/100).toFixed(2)} CAD sent via Stripe.`);
+        setInvoices(prev => [{
+          id: data.invoiceId,
+          event_type: "filing_invoice_created",
+          amount_cents: data.amount_cents,
+          description: data.description,
+          created_at: new Date().toISOString(),
+        }, ...prev]);
+        setOverride("");
+      } else {
+        setError(data.error || "Failed to create invoice.");
+      }
+    } finally { setCreating(false); }
+  }
+
+  const fmtCAD = cents => `$${((cents||0)/100).toFixed(2)} CAD`;
+
+  return (
+    <div>
+      <div style={{ fontSize:13, fontWeight:600, color:C.text, marginBottom:14 }}>Invoices — {wf?.label}</div>
+
+      {/* Create invoice */}
+      <Card style={{ padding:"16px 18px", marginBottom:14 }}>
+        <div style={{ fontSize:13, fontWeight:500, color:C.text, marginBottom:8 }}>Create invoice for this workflow</div>
+        {error && <div style={{ background:C.redBg, border:"1px solid #FCA5A5", borderRadius:7, padding:"8px 12px", fontSize:12, color:C.red, marginBottom:10 }}>{error}</div>}
+        {success && <div style={{ background:C.greenBg, border:"1px solid #BBF7D0", borderRadius:7, padding:"8px 12px", fontSize:12, color:C.green, marginBottom:10 }}>✓ {success}</div>}
+        <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+          <input type="number" min="0" step="0.01" placeholder="Amount (CAD) — leave blank to use rate from Settings"
+            value={override} onChange={e => setOverride(e.target.value)}
+            style={{ flex:1, padding:"7px 10px", borderRadius:7, border:`1px solid ${C.border}`, fontSize:13 }} />
+          <button onClick={createInvoice} disabled={creating}
+            style={{ background:C.primary, color:"white", border:"none", borderRadius:7, padding:"7px 16px", fontSize:13, fontWeight:600, cursor:"pointer", opacity:creating?0.7:1, whiteSpace:"nowrap" }}>
+            {creating ? "Sending…" : "Send Invoice →"}
+          </button>
+        </div>
+        <div style={{ fontSize:11, color:C.muted, marginTop:6 }}>
+          Default rates are set in Settings → Billing → Billing Rates. Invoice is sent via Stripe to the client email on file.
+        </div>
+      </Card>
+
+      {/* Invoice history */}
+      {loading ? (
+        <div style={{ textAlign:"center", padding:16, color:C.muted, fontSize:13 }}>Loading…</div>
+      ) : invoices.length === 0 ? (
+        <div style={{ textAlign:"center", padding:24, color:C.muted }}>
+          <div style={{ fontSize:28, marginBottom:8 }}>🧾</div>
+          <div style={{ fontSize:13 }}>No invoices yet for this workflow.</div>
+        </div>
+      ) : (
+        <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+          {invoices.map((inv, i) => (
+            <div key={inv.id || i} style={{ background:"white", border:`1px solid ${C.border}`, borderRadius:8, padding:"12px 16px", display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+              <div>
+                <div style={{ fontSize:13, fontWeight:500, color:C.text }}>{inv.description || "Filing invoice"}</div>
+                <div style={{ fontSize:11, color:C.muted, marginTop:3 }}>
+                  {new Date(inv.created_at).toLocaleDateString("en-CA",{month:"short",day:"numeric",year:"numeric"})}
+                </div>
+              </div>
+              <div style={{ fontSize:14, fontWeight:600, color:C.green }}>{fmtCAD(inv.amount_cents)}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── INTEGRATION TAB (wired to DB) ───────────────────────────────────────────
 function IntegrationTab({ clientId }) {
   const [integrations, setIntegrations] = useState([]);
@@ -1823,7 +2128,7 @@ function ClientWorkspace({ client: initialClient, onBack, onRefresh }) {
 
       {/* Tabs */}
       <div style={{ display:"flex", borderBottom:`1px solid ${C.border}`, marginBottom:18 }}>
-        {["workflow","tasks","documents","activity","integration"].map(t => (
+        {["workflow","tasks","documents","time","invoices","activity","integration"].map(t => (
           <button key={t} onClick={() => setTab(t)} style={{ background:"none", border:"none", borderBottom:tab===t?`2px solid ${C.primary}`:"2px solid transparent", padding:"9px 16px", cursor:"pointer", fontSize:13, fontWeight:tab===t?600:400, color:tab===t?C.primary:C.muted, textTransform:"capitalize" }}>{t}</button>
         ))}
       </div>
@@ -1846,6 +2151,16 @@ function ClientWorkspace({ client: initialClient, onBack, onRefresh }) {
       {/* ACTIVITY TAB */}
       {tab==="activity" && (
         <ActivityTab clientId={client.id} key={client.id} />
+      )}
+
+      {/* TIME TRACKING TAB */}
+      {tab==="time" && wf && (
+        <TimeTrackingTab wf={wf} client={client} />
+      )}
+
+      {/* INVOICES TAB */}
+      {tab==="invoices" && wf && (
+        <InvoicesTab wf={wf} client={client} />
       )}
 
       {/* INTEGRATION TAB */}
@@ -1963,6 +2278,73 @@ function DeadlinesView({ clients, onSelectClient }) {
       <Section title="At Risk — deadline within 7 days" rows={risk} color={C.amber} bg={C.amberBg} />
       <Section title="Upcoming — next 30 days" rows={soon} color={C.green} bg={C.greenBg} />
     </div>
+  );
+}
+
+
+// ─── BILLING RATES SECTION ────────────────────────────────────────────────────
+function BillingRatesSection() {
+  const WORKFLOW_TYPES = ["GST/HST","T1","T2","Payroll","Bookkeeping"];
+  const [rates, setRates]   = useState({});
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg]       = useState(null);
+
+  useEffect(() => {
+    fetch("/api/settings", { credentials:"include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(json => {
+        if (json?.settings?.billing_rates) {
+          // Convert cents to CAD display
+          const display = {};
+          Object.entries(json.settings.billing_rates).forEach(([k,v]) => { display[k] = (v/100).toFixed(2); });
+          setRates(display);
+        }
+      });
+  }, []);
+
+  async function save() {
+    setSaving(true); setMsg(null);
+    const cents = {};
+    Object.entries(rates).forEach(([k,v]) => { if (v && parseFloat(v) > 0) cents[k] = Math.round(parseFloat(v)*100); });
+    const res = await fetch("/api/settings", {
+      method:"PATCH", credentials:"include",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ billing_rates: cents }),
+    });
+    setSaving(false);
+    setMsg(res.ok ? "Saved." : "Failed to save.");
+    setTimeout(() => setMsg(null), 3000);
+  }
+
+  return (
+    <Card style={{ padding:"20px 24px", marginTop:14 }}>
+      <div style={{ fontSize:14, fontWeight:600, color:C.text, marginBottom:4 }}>Per-Filing Billing Rates</div>
+      <div style={{ fontSize:12, color:C.muted, marginBottom:14 }}>
+        Set a default rate per filing type in CAD. Used when "Auto-invoice on completion" is enabled.
+      </div>
+      <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+        {WORKFLOW_TYPES.map(type => (
+          <div key={type} style={{ display:"flex", alignItems:"center", gap:12 }}>
+            <div style={{ width:140, fontSize:13, fontWeight:500, color:C.text }}>{type}</div>
+            <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+              <span style={{ fontSize:13, color:C.muted }}>$</span>
+              <input type="number" min="0" step="0.01" placeholder="0.00"
+                value={rates[type] || ""}
+                onChange={e => setRates(r => ({...r, [type]: e.target.value}))}
+                style={{ width:100, padding:"6px 10px", borderRadius:7, border:`1px solid ${C.border}`, fontSize:13 }} />
+              <span style={{ fontSize:12, color:C.muted }}>CAD</span>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div style={{ display:"flex", alignItems:"center", gap:10, marginTop:14 }}>
+        <button onClick={save} disabled={saving}
+          style={{ background:C.primary, color:"white", border:"none", borderRadius:8, padding:"7px 16px", fontSize:13, fontWeight:600, cursor:"pointer" }}>
+          {saving ? "Saving…" : "Save Rates"}
+        </button>
+        {msg && <span style={{ fontSize:12, color:C.green }}>{msg}</span>}
+      </div>
+    </Card>
   );
 }
 
@@ -2359,12 +2741,12 @@ function SettingsPage() {
   const [activeTab, setActiveTab] = useState("firm");
 
   // ── Firm profile state ───────────────────────────────────────────────────────
-  const [firm, setFirm]       = useState({ name:"", email:"", province:"", bn:"" });
+  const [firm, setFirm]       = useState({ name:"", email:"", province:"Ontario", bn:"" });
   const [firmSaving, setFirmSaving] = useState(false);
   const [firmMsg, setFirmMsg] = useState(null);
 
   // ── Automation rules state ───────────────────────────────────────────────────
-  const [rules, setRules]       = useState({ auto_create_workflows:true, doc_reminder_day3:true, escalate_on_reminder2:true, deadline_alert_3d:true, overdue_flag:true });
+  const [rules, setRules]       = useState({ auto_create_workflows:true, doc_reminder_day3:true, escalate_on_reminder2:true, deadline_alert_3d:true, overdue_flag:true, require_upload_to_receive:false, doc_reminder_send_to_client:false, invoice_on_completion:false });
   const [rulesSaving, setRulesSaving] = useState(false);
   const [rulesMsg, setRulesMsg] = useState(null);
 
@@ -2500,7 +2882,7 @@ function SettingsPage() {
             {[
               ["Firm Name","name","text"],
               ["Primary Email","email","email"],
-              ["Province","province","text", ["Alberta","British Columbia","Manitoba","New Brunswick","Newfoundland and Labrador","Nova Scotia","Ontario","Prince Edward Island","Quebec","Saskatchewan","Northwest Territories","Nunavut","Yukon"]],
+              ["Province","province","text"],
               ["CRA Business Number","bn","text"],
             ].map(([label,key,type]) => (
               <div key={key}>
@@ -2605,6 +2987,9 @@ function SettingsPage() {
               ["escalate_on_reminder2",  "Escalate to owner on Reminder #2",                    "When Reminder #2 is sent, the firm owner is CC'd automatically."],
               ["deadline_alert_3d",      "Deadline alert 3 days before CRA due date",           "Assigned accountant is notified 3 days before the CRA deadline if workflow is not Complete."],
               ["overdue_flag",           "Flag overdue clients on dashboard",                   "Clients past their CRA deadline with an incomplete workflow are flagged Overdue."],
+              ["require_upload_to_receive","Require file upload before marking received",      "Accountants cannot click 'Mark Received' without uploading the file. Enforced server-side."],
+              ["doc_reminder_send_to_client","Send reminders directly to client",              "Reminder emails go to the client's email directly. Accountant is CC'd. Requires client_email on profile."],
+              ["invoice_on_completion",    "Auto-invoice when workflow completes",             "Creates and sends a Stripe invoice at Stage 6 close using the billing rate for that workflow type."],
             ].map(([key, label, desc]) => (
               <div key={key} style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:16 }}>
                 <div style={{ flex:1 }}>
@@ -2649,6 +3034,9 @@ function SettingsPage() {
           </div>
           <div style={{ fontSize:11, color:C.muted }}>Billing is managed via Stripe. Click "Manage Plan" to update your subscription, view invoices, or cancel.</div>
         </Card>
+
+        {/* Per-job billing rates */}
+        <BillingRatesSection />
       )}
     </div>
   );
