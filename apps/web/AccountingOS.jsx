@@ -3020,6 +3020,7 @@ function SettingsPage() {
 
       {/* ── BILLING ── */}
       {activeTab==="billing" && (
+        <>
         <Card style={{ padding:"20px 24px" }}>
           <div style={{ fontSize:14, fontWeight:600, color:C.text, marginBottom:16 }}>Billing Plan</div>
           <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:12, marginBottom:16 }}>
@@ -3045,6 +3046,7 @@ function SettingsPage() {
 
         {/* Per-job billing rates */}
         <BillingRatesSection />
+        </>
       )}
     </div>
   );
