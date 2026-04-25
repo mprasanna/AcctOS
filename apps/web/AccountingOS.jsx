@@ -1991,8 +1991,8 @@ function EditClientModal({ client, onClose, onSaved }) {
 }
 
 // ─── CLIENT WORKSPACE ────────────────────────────────────────────────────────
-function ClientWorkspace({ client: initialClient, onBack, onRefresh }) {
-  const [tab, setTab]         = useState("workflow");
+function ClientWorkspace({ client: initialClient, initialTab, onBack, onRefresh }) {
+  const [tab, setTab]         = useState(initialTab || "workflow");
   const [wfIdx, setWfIdx]     = useState(0);
   const [client, setClient]   = useState(initialClient);
   const [refreshing, setRefreshing] = useState(false);
@@ -2136,7 +2136,7 @@ function ClientWorkspace({ client: initialClient, onBack, onRefresh }) {
 
       {/* Tabs */}
       <div style={{ display:"flex", borderBottom:`1px solid ${C.border}`, marginBottom:18 }}>
-        {["workflow","tasks","documents","time","invoices","activity","integration"].map(t => (
+        {["workflow","tasks","documents","messages","time","invoices","activity","integration"].map(t => (
           <button key={t} onClick={() => setTab(t)} style={{ background:"none", border:"none", borderBottom:tab===t?`2px solid ${C.primary}`:"2px solid transparent", padding:"9px 16px", cursor:"pointer", fontSize:13, fontWeight:tab===t?600:400, color:tab===t?C.primary:C.muted, textTransform:"capitalize" }}>{t}</button>
         ))}
       </div>
@@ -2154,6 +2154,11 @@ function ClientWorkspace({ client: initialClient, onBack, onRefresh }) {
       {/* DOCUMENTS TAB */}
       {tab==="documents" && wf && (
         <DocumentsTab wf={wf} client={client} onRefresh={handleRefresh} />
+      )}
+
+      {/* MESSAGES TAB */}
+      {tab==="messages" && (
+        <MessagesTab client={client} />
       )}
 
       {/* ACTIVITY TAB */}
@@ -2821,6 +2826,396 @@ function WhyUsPage() {
     </div>
   );
 }
+// ─── PORTAL MESSAGING — FIRM SIDE ────────────────────────────────────────────
+
+function useUnreadMessages() {
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    fetch("/api/notifications", { credentials:"include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.unread_messages != null) setCount(d.unread_messages); })
+      .catch(()=>{});
+  }, []);
+  return { count, setCount };
+}
+
+function MessagesPage({ onSelectClient }) {
+  const [messages, setMessages] = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [showAll, setShowAll]   = useState(false);
+  const [replyingTo, setReplyingTo] = useState(null);
+  const [replyBody, setReplyBody]   = useState("");
+  const [replySending, setReplySending] = useState(false);
+
+  function load(all=false) {
+    setLoading(true);
+    fetch(`/api/messages${all?"?all=true":""}`, { credentials:"include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.messages) setMessages(d.messages); })
+      .catch(()=>{})
+      .finally(() => setLoading(false));
+  }
+  useEffect(() => { load(showAll); }, [showAll]);
+
+  async function markRead(ids) {
+    await fetch("/api/messages/read", {
+      method:"PATCH", credentials:"include",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ message_ids: ids }),
+    });
+    setMessages(prev => prev.map(m => ids.includes(m.id) ? {...m, read_at: new Date().toISOString()} : m));
+  }
+
+  async function sendReply(msg) {
+    if (!replyBody.trim()) return;
+    setReplySending(true);
+    try {
+      const res = await fetch(`/api/messages/${msg.id}/reply`, {
+        method:"POST", credentials:"include",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ body: replyBody.trim(), workflow_id: msg.workflow_id }),
+      });
+      if (res.ok) { setReplyBody(""); setReplyingTo(null); load(showAll); }
+    } finally { setReplySending(false); }
+  }
+
+  const unread = messages.filter(m => !m.read_at);
+
+  return (
+    <div>
+      <SectionHead
+        title="Messages"
+        sub="Messages from your clients through the portal"
+        action={
+          <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+            {unread.length > 0 && (
+              <button onClick={() => markRead(unread.map(m=>m.id))}
+                style={{ background:"none", border:`1px solid ${C.border}`, borderRadius:7, padding:"5px 12px", fontSize:12, color:C.muted, cursor:"pointer" }}>
+                Mark all read
+              </button>
+            )}
+            <button onClick={() => setShowAll(v => !v)}
+              style={{ background:"none", border:`1px solid ${C.border}`, borderRadius:7, padding:"5px 12px", fontSize:12, color:C.muted, cursor:"pointer" }}>
+              {showAll ? "Show unread only" : "Show all"}
+            </button>
+          </div>
+        }
+      />
+      {unread.length > 0 && (
+        <div style={{ background:C.primaryBg, border:`1px solid #BFDBFE`, borderRadius:9, padding:"10px 16px", marginBottom:16, fontSize:13, color:C.primary }}>
+          {unread.length} unread message{unread.length>1?"s":""} from your clients
+        </div>
+      )}
+      {loading ? (
+        <div style={{ padding:"40px", textAlign:"center", color:C.muted, fontSize:13 }}>Loading messages…</div>
+      ) : messages.length === 0 ? (
+        <Card style={{ padding:"48px 32px", textAlign:"center" }}>
+          <div style={{ fontSize:32, marginBottom:12 }}>💬</div>
+          <div style={{ fontSize:15, fontWeight:600, color:C.text, marginBottom:6 }}>No messages yet</div>
+          <div style={{ fontSize:13, color:C.muted }}>When your clients send messages through their portal, they'll appear here.</div>
+        </Card>
+      ) : (
+        <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+          {messages.map(msg => {
+            const isUnread = !msg.read_at;
+            const isReplying = replyingTo === msg.id;
+            return (
+              <Card key={msg.id} style={{ padding:"14px 18px", borderLeft:`3px solid ${isUnread?C.primary:C.border}`, background:isUnread?"#F8FAFF":"white" }}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:8 }}>
+                  <div style={{ display:"flex", gap:10, alignItems:"center" }}>
+                    <Avatar name={msg.sender_name || msg.client_name} size={32} />
+                    <div>
+                      <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+                        <span style={{ fontSize:13, fontWeight:600, color:C.text }}>{msg.client_name}</span>
+                        {isUnread && <span style={{ background:C.primary, color:"white", fontSize:10, fontWeight:700, padding:"1px 7px", borderRadius:10 }}>New</span>}
+                        {msg.workflow_label && <span style={{ background:C.primaryBg, color:C.primary, fontSize:11, padding:"1px 8px", borderRadius:6 }}>{msg.workflow_label}</span>}
+                      </div>
+                      <div style={{ fontSize:11, color:C.muted, marginTop:1 }}>
+                        {msg.sender_name} · {new Date(msg.created_at).toLocaleDateString("en-CA",{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"})}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ display:"flex", gap:6 }}>
+                    <button onClick={() => { markRead([msg.id]); onSelectClient && onSelectClient(msg.client_id, "messages"); }}
+                      style={{ background:C.primaryBg, color:C.primary, border:"none", borderRadius:6, padding:"4px 10px", fontSize:11, fontWeight:600, cursor:"pointer" }}>
+                      Open in client →
+                    </button>
+                    <button onClick={() => { setReplyingTo(isReplying ? null : msg.id); if(!msg.read_at) markRead([msg.id]); }}
+                      style={{ background:"none", border:`1px solid ${C.border}`, borderRadius:6, padding:"4px 10px", fontSize:11, cursor:"pointer" }}>
+                      {isReplying ? "Cancel" : "Reply"}
+                    </button>
+                  </div>
+                </div>
+                <div style={{ fontSize:13, color:C.text, background:"#F8FAFC", borderRadius:7, padding:"9px 12px", marginBottom: isReplying ? 10 : 0 }}>
+                  {msg.body}
+                </div>
+                {isReplying && (
+                  <div style={{ display:"flex", gap:8, marginTop:8 }}>
+                    <textarea value={replyBody} onChange={e => setReplyBody(e.target.value)}
+                      placeholder="Type your reply…" rows={2}
+                      style={{ flex:1, padding:"8px 12px", borderRadius:8, border:`1px solid ${C.border}`, fontSize:13, resize:"vertical", outline:"none", fontFamily:"inherit" }} />
+                    <button onClick={() => sendReply(msg)} disabled={replySending || !replyBody.trim()}
+                      style={{ background:C.primary, color:"white", border:"none", borderRadius:8, padding:"8px 16px", fontSize:13, fontWeight:600, cursor:replyBody.trim()&&!replySending?"pointer":"not-allowed", opacity:replySending?0.7:1, alignSelf:"flex-start" }}>
+                      {replySending ? "Sending…" : "Send"}
+                    </button>
+                  </div>
+                )}
+              </Card>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MessagesTab({ client }) {
+  const [messages, setMessages] = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [body, setBody]         = useState("");
+  const [sending, setSending]   = useState(false);
+  const [workflowId, setWorkflowId] = useState("");
+  const [filterWf, setFilterWf] = useState("all");
+
+  function load() {
+    const base = `/api/messages?client_id=${client.id}`;
+    const qs   = filterWf !== "all" ? `&workflow_id=${filterWf}` : "";
+    fetch(base + qs, { credentials:"include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.messages) setMessages(d.messages); })
+      .catch(()=>{})
+      .finally(() => setLoading(false));
+  }
+  useEffect(() => { load(); }, [filterWf, client.id]);
+
+  async function sendReply() {
+    if (!body.trim()) return;
+    setSending(true);
+    const lastClientMsg = messages.filter(m => m.sender_type==="client").slice(-1)[0];
+    try {
+      const res = await fetch(`/api/messages/${lastClientMsg?.id || "new"}/reply`, {
+        method:"POST", credentials:"include",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ body: body.trim(), workflow_id: workflowId || null, client_id: client.id }),
+      });
+      if (res.ok) { setBody(""); load(); }
+    } finally { setSending(false); }
+  }
+
+  const workflows = client.workflows || [];
+
+  return (
+    <div>
+      <div style={{ display:"flex", gap:8, marginBottom:16, flexWrap:"wrap" }}>
+        <button onClick={() => setFilterWf("all")}
+          style={{ background:filterWf==="all"?C.primaryBg:"white", color:filterWf==="all"?C.primary:C.muted, border:`1px solid ${filterWf==="all"?C.primary:C.border}`, borderRadius:7, padding:"5px 12px", fontSize:12, cursor:"pointer", fontWeight:filterWf==="all"?600:400 }}>
+          All messages
+        </button>
+        {workflows.map(wf => (
+          <button key={wf.id} onClick={() => setFilterWf(wf.id)}
+            style={{ background:filterWf===wf.id?C.primaryBg:"white", color:filterWf===wf.id?C.primary:C.muted, border:`1px solid ${filterWf===wf.id?C.primary:C.border}`, borderRadius:7, padding:"5px 12px", fontSize:12, cursor:"pointer", fontWeight:filterWf===wf.id?600:400 }}>
+            {wf.type} — {wf.period}
+          </button>
+        ))}
+      </div>
+      <div style={{ display:"flex", flexDirection:"column", gap:8, marginBottom:16, minHeight:120 }}>
+        {loading ? (
+          <div style={{ textAlign:"center", padding:"32px", color:C.muted, fontSize:13 }}>Loading…</div>
+        ) : messages.length === 0 ? (
+          <div style={{ textAlign:"center", padding:"32px", color:C.muted, fontSize:13 }}>
+            No messages yet. When {client.name.split(" ")[0]} sends a message through their portal, it will appear here.
+          </div>
+        ) : messages.map(msg => {
+          const isClient = msg.sender_type === "client";
+          return (
+            <div key={msg.id} style={{ display:"flex", flexDirection:"column", alignItems:isClient?"flex-start":"flex-end" }}>
+              <div style={{ maxWidth:"78%", background:isClient?"#F8FAFC":C.primaryBg, border:`1px solid ${isClient?C.border:"#BFDBFE"}`, borderRadius:10, padding:"9px 14px" }}>
+                <div style={{ fontSize:11, color:C.muted, marginBottom:4, display:"flex", gap:8 }}>
+                  <span style={{ fontWeight:600, color:isClient?C.text:C.primary }}>{isClient ? msg.sender_name : "You"}</span>
+                  {msg.workflow_label && <span style={{ background:isClient?"#E2E8F0":C.primary, color:isClient?C.muted:"white", fontSize:10, padding:"0px 6px", borderRadius:4 }}>{msg.workflow_label}</span>}
+                  <span>{new Date(msg.created_at).toLocaleDateString("en-CA",{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"})}</span>
+                </div>
+                <div style={{ fontSize:13, color:C.text, lineHeight:1.5 }}>{msg.body}</div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div style={{ borderTop:`1px solid ${C.border}`, paddingTop:14 }}>
+        <div style={{ display:"flex", gap:8, marginBottom:8, alignItems:"center" }}>
+          <span style={{ fontSize:12, color:C.muted, flexShrink:0 }}>Re:</span>
+          <select value={workflowId} onChange={e => setWorkflowId(e.target.value)}
+            style={{ padding:"5px 10px", borderRadius:7, border:`1px solid ${C.border}`, fontSize:12, outline:"none", background:"white", flex:1 }}>
+            <option value="">General (no specific filing)</option>
+            {workflows.map(wf => <option key={wf.id} value={wf.id}>{wf.type} — {wf.period}</option>)}
+          </select>
+        </div>
+        <div style={{ display:"flex", gap:8 }}>
+          <textarea value={body} onChange={e => setBody(e.target.value)}
+            placeholder={`Reply to ${client.name.split(" ")[0]}…`} rows={3}
+            style={{ flex:1, padding:"9px 12px", borderRadius:8, border:`1px solid ${C.border}`, fontSize:13, resize:"vertical", outline:"none", fontFamily:"inherit" }} />
+          <button onClick={sendReply} disabled={sending || !body.trim()}
+            style={{ background:C.primary, color:"white", border:"none", borderRadius:8, padding:"10px 18px", fontSize:13, fontWeight:600, cursor:body.trim()&&!sending?"pointer":"not-allowed", opacity:sending?0.7:1, alignSelf:"flex-end" }}>
+            {sending ? "…" : "Send"}
+          </button>
+        </div>
+        <div style={{ fontSize:11, color:C.muted, marginTop:6 }}>Reply is sent to the client's portal immediately.</div>
+      </div>
+    </div>
+  );
+}
+
+function PortalSettingsTab() {
+  const [portal, setPortal] = useState({ tagline:"Your secure accounting portal", esign_provider:"none", esign_key:"", esign_secret:"" });
+  const [logoUrl, setLogoUrl]         = useState(null);
+  const [logoFile, setLogoFile]       = useState(null);
+  const [logoPreview, setLogoPreview] = useState(null);
+  const [saving, setSaving]           = useState(false);
+  const [logoSaving, setLogoSaving]   = useState(false);
+  const [msg, setMsg]                 = useState(null);
+  const [showKey, setShowKey]         = useState(false);
+
+  useEffect(() => {
+    fetch("/api/settings", { credentials:"include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (d?.portal) setPortal(p => ({...p, ...d.portal}));
+        if (d?.portal?.logo_url) setLogoUrl(d.portal.logo_url);
+      }).catch(()=>{});
+  }, []);
+
+  function handleLogoChange(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) { setMsg({ ok:false, text:"Logo must be under 2MB." }); return; }
+    if (!["image/png","image/jpeg","image/jpg","image/svg+xml"].includes(file.type)) { setMsg({ ok:false, text:"PNG, JPG, or SVG only." }); return; }
+    setLogoFile(file);
+    setLogoPreview(URL.createObjectURL(file));
+  }
+
+  async function uploadLogo() {
+    if (!logoFile) return;
+    setLogoSaving(true); setMsg(null);
+    try {
+      const fd = new FormData(); fd.append("logo", logoFile);
+      const res = await fetch("/api/settings/portal/logo", { method:"POST", credentials:"include", body:fd });
+      const data = await res.json();
+      if (res.ok) { setLogoUrl(data.logo_url); setLogoFile(null); setMsg({ ok:true, text:"Logo uploaded." }); }
+      else setMsg({ ok:false, text:data.error || "Upload failed." });
+    } catch(e) { setMsg({ ok:false, text:"Network error." }); }
+    finally { setLogoSaving(false); }
+  }
+
+  async function removeLogo() {
+    setLogoSaving(true);
+    try {
+      const res = await fetch("/api/settings/portal/logo", { method:"DELETE", credentials:"include" });
+      if (res.ok) { setLogoUrl(null); setLogoPreview(null); setMsg({ ok:true, text:"Logo removed." }); }
+    } finally { setLogoSaving(false); }
+  }
+
+  async function save() {
+    setSaving(true); setMsg(null);
+    try {
+      const res = await fetch("/api/settings", { method:"PATCH", credentials:"include", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ portal }) });
+      const data = await res.json();
+      setMsg(res.ok ? { ok:true, text:"Portal settings saved." } : { ok:false, text:data.error || "Failed." });
+    } catch(e) { setMsg({ ok:false, text:"Network error." }); }
+    finally { setSaving(false); }
+  }
+
+  const firmInitials = "J&A";
+
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+      {msg && <div style={{ background:msg.ok?C.greenBg:C.redBg, border:`1px solid ${msg.ok?"#BBF7D0":"#FCA5A5"}`, borderRadius:8, padding:"8px 12px", fontSize:12, color:msg.ok?"#14532D":C.red }}>{msg.text}</div>}
+
+      <Card style={{ padding:"20px 24px" }}>
+        <div style={{ fontSize:14, fontWeight:600, color:C.text, marginBottom:4 }}>Portal branding</div>
+        <div style={{ fontSize:12, color:C.muted, marginBottom:16 }}>Your clients see this when they log in. Use your firm logo and a short tagline to build trust.</div>
+        <div style={{ display:"flex", gap:20, alignItems:"flex-start", marginBottom:16 }}>
+          <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:8 }}>
+            <div style={{ width:80, height:80, borderRadius:12, border:`2px dashed ${C.border}`, display:"flex", alignItems:"center", justifyContent:"center", overflow:"hidden", background:"#F8FAFC" }}>
+              {(logoPreview || logoUrl) ? <img src={logoPreview||logoUrl} alt="Logo" style={{ width:"100%", height:"100%", objectFit:"contain" }} /> : <div style={{ fontSize:20, fontWeight:700, color:C.muted }}>{firmInitials}</div>}
+            </div>
+            <div style={{ display:"flex", gap:6 }}>
+              <label style={{ background:"none", border:`1px solid ${C.border}`, borderRadius:6, padding:"4px 10px", fontSize:11, color:C.text, cursor:"pointer" }}>
+                {logoUrl ? "Change" : "Upload"}
+                <input type="file" accept="image/png,image/jpeg,image/svg+xml" onChange={handleLogoChange} style={{ display:"none" }} />
+              </label>
+              {(logoUrl || logoPreview) && <button onClick={removeLogo} style={{ background:"none", border:"none", fontSize:11, color:C.red, cursor:"pointer" }}>Remove</button>}
+            </div>
+            {logoFile && <button onClick={uploadLogo} disabled={logoSaving} style={{ background:C.primary, color:"white", border:"none", borderRadius:6, padding:"4px 12px", fontSize:11, fontWeight:600, cursor:"pointer" }}>{logoSaving ? "Uploading…" : "Save logo"}</button>}
+            <div style={{ fontSize:10, color:C.slate, textAlign:"center" }}>PNG, JPG or SVG · Max 2MB</div>
+          </div>
+          <div style={{ flex:1 }}>
+            <label style={{ display:"block", fontSize:11, fontWeight:600, color:C.muted, marginBottom:5, textTransform:"uppercase", letterSpacing:"0.05em" }}>Portal tagline</label>
+            <input value={portal.tagline} onChange={e => setPortal(p=>({...p,tagline:e.target.value}))} placeholder="Your secure accounting portal" maxLength={80}
+              style={{ width:"100%", padding:"8px 12px", borderRadius:8, border:`1px solid ${C.border}`, fontSize:13, outline:"none", boxSizing:"border-box" }} />
+            <div style={{ fontSize:11, color:C.slate, marginTop:4 }}>One line shown below your firm name on the portal login page.</div>
+          </div>
+        </div>
+        <div style={{ background:"#F1F5F9", borderRadius:10, padding:"16px", marginBottom:4 }}>
+          <div style={{ fontSize:11, fontWeight:600, color:C.muted, textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:10 }}>Login page preview</div>
+          <div style={{ background:"white", borderRadius:10, padding:"24px", maxWidth:280, margin:"0 auto", textAlign:"center", border:`1px solid ${C.border}` }}>
+            <div style={{ width:48, height:48, borderRadius:9, border:`2px solid ${C.border}`, display:"flex", alignItems:"center", justifyContent:"center", overflow:"hidden", margin:"0 auto 10px", background:"#F8FAFC" }}>
+              {(logoPreview || logoUrl) ? <img src={logoPreview||logoUrl} alt="" style={{ width:"100%", height:"100%", objectFit:"contain" }} /> : <div style={{ fontSize:14, fontWeight:700, color:C.muted }}>{firmInitials}</div>}
+            </div>
+            <div style={{ fontSize:14, fontWeight:700, color:C.text, marginBottom:3 }}>Jensen & Associates</div>
+            <div style={{ fontSize:11, color:C.muted, marginBottom:14 }}>{portal.tagline || "Your secure accounting portal"}</div>
+            <div style={{ background:"#F8FAFC", borderRadius:7, padding:"7px 10px", marginBottom:6, fontSize:11, color:C.slate, textAlign:"left" }}>Email</div>
+            <div style={{ background:"#F8FAFC", borderRadius:7, padding:"7px 10px", marginBottom:10, fontSize:11, color:C.slate, textAlign:"left" }}>Password</div>
+            <div style={{ background:C.primary, color:"white", borderRadius:7, padding:"8px", fontSize:12, fontWeight:600 }}>Sign in</div>
+            <div style={{ fontSize:9, color:C.slate, marginTop:10 }}>Secured by AcctOS</div>
+          </div>
+        </div>
+      </Card>
+
+      <Card style={{ padding:"20px 24px" }}>
+        <div style={{ fontSize:14, fontWeight:600, color:C.text, marginBottom:4 }}>E-signature provider</div>
+        <div style={{ fontSize:12, color:C.muted, marginBottom:16 }}>Used for T183 authorization on T1 workflows. Clients receive a signing request instead of uploading a scanned form.</div>
+        <div style={{ display:"flex", flexDirection:"column", gap:10, marginBottom:16 }}>
+          {[["none","No e-signatures","Clients scan and upload the T183 form. Current default."],["docusign","DocuSign","Industry-standard. Clients recognize the brand. Recommended."],["dropboxsign","Dropbox Sign","Developer-friendly. Simpler API. Lower cost at low volume."]].map(([val, label, desc]) => (
+            <div key={val} onClick={() => setPortal(p=>({...p,esign_provider:val}))}
+              style={{ display:"flex", gap:12, alignItems:"flex-start", padding:"12px 14px", borderRadius:9, border:`1.5px solid ${portal.esign_provider===val?C.primary:C.border}`, background:portal.esign_provider===val?C.primaryBg:"white", cursor:"pointer" }}>
+              <div style={{ width:16, height:16, borderRadius:"50%", border:`2px solid ${portal.esign_provider===val?C.primary:C.border}`, background:portal.esign_provider===val?C.primary:"white", flexShrink:0, marginTop:1, display:"flex", alignItems:"center", justifyContent:"center" }}>
+                {portal.esign_provider===val && <div style={{ width:6, height:6, borderRadius:"50%", background:"white" }} />}
+              </div>
+              <div><div style={{ fontSize:13, fontWeight:600, color:C.text }}>{label}</div><div style={{ fontSize:12, color:C.muted }}>{desc}</div></div>
+            </div>
+          ))}
+        </div>
+        {portal.esign_provider !== "none" && (
+          <div style={{ display:"flex", flexDirection:"column", gap:10, padding:"14px", background:"#F8FAFC", borderRadius:9, border:`1px solid ${C.border}` }}>
+            <div style={{ fontSize:12, fontWeight:600, color:C.text }}>{portal.esign_provider === "docusign" ? "DocuSign" : "Dropbox Sign"} API credentials</div>
+            <div>
+              <label style={{ display:"block", fontSize:11, fontWeight:600, color:C.muted, marginBottom:4, textTransform:"uppercase", letterSpacing:"0.05em" }}>API Key</label>
+              <div style={{ display:"flex", gap:6 }}>
+                <input type={showKey?"text":"password"} value={portal.esign_key} onChange={e => setPortal(p=>({...p,esign_key:e.target.value}))} placeholder="Paste your API key"
+                  style={{ flex:1, padding:"7px 10px", borderRadius:7, border:`1px solid ${C.border}`, fontSize:13, outline:"none" }} />
+                <button onClick={() => setShowKey(v=>!v)} style={{ background:"none", border:`1px solid ${C.border}`, borderRadius:7, padding:"7px 10px", fontSize:11, color:C.muted, cursor:"pointer" }}>{showKey?"Hide":"Show"}</button>
+              </div>
+            </div>
+            <div>
+              <label style={{ display:"block", fontSize:11, fontWeight:600, color:C.muted, marginBottom:4, textTransform:"uppercase", letterSpacing:"0.05em" }}>{portal.esign_provider === "docusign" ? "Account ID / Secret" : "API Secret"}</label>
+              <input type="password" value={portal.esign_secret} onChange={e => setPortal(p=>({...p,esign_secret:e.target.value}))} placeholder="Paste your secret"
+                style={{ width:"100%", padding:"7px 10px", borderRadius:7, border:`1px solid ${C.border}`, fontSize:13, outline:"none", boxSizing:"border-box" }} />
+            </div>
+            <div style={{ fontSize:11, color:C.muted }}>{portal.esign_provider === "docusign" ? "Find these in your DocuSign Developer account under Apps & Keys." : "Find these in your Dropbox Sign dashboard under API → API Key."}</div>
+          </div>
+        )}
+      </Card>
+
+      <div>
+        <button onClick={save} disabled={saving}
+          style={{ background:C.primary, color:"white", border:"none", borderRadius:8, padding:"9px 22px", fontSize:13, fontWeight:600, cursor:saving?"not-allowed":"pointer", opacity:saving?0.7:1 }}>
+          {saving ? "Saving…" : "Save Portal Settings"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── SETTINGS ────────────────────────────────────────────────────────────────
 function SettingsPage() {
   const [activeTab, setActiveTab] = useState("firm");
@@ -2941,8 +3336,8 @@ function SettingsPage() {
     admin:             [C.amberBg, C.amber],
   };
 
-  const tabs = ["firm","team","automation","billing"];
-  const tabLabels = { firm:"Firm Profile", team:"Team & Roles", automation:"Automation", billing:"Billing" };
+  const tabs = ["firm","team","automation","portal","billing"];
+  const tabLabels = { firm:"Firm Profile", team:"Team & Roles", automation:"Automation", portal:"Client Portal", billing:"Billing" };
 
   return (
     <div>
@@ -3095,6 +3490,9 @@ function SettingsPage() {
         </Card>
       )}
 
+      {/* ── CLIENT PORTAL ── */}
+      {activeTab==="portal" && <PortalSettingsTab />}
+
       {/* ── BILLING ── */}
       {activeTab==="billing" && (
         <>
@@ -3135,6 +3533,7 @@ export default function App() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [showAddClient, setShowAddClient] = useState(false);
   const { clients, loading, error } = useClients(refreshKey);
+  const { count: unreadMsgs } = useUnreadMessages();
   const urgent = clients.filter(c => c.status==="At Risk"||c.status==="Overdue").length;
   const onRefresh = () => setRefreshKey(k => k + 1);
   const onAddClient = () => setShowAddClient(true);
@@ -3142,6 +3541,7 @@ export default function App() {
   const nav = [
     { id:"dashboard",    label:"Command Centre", icon:"⊞" },
     { id:"clients",      label:"Clients",        icon:"👥" },
+    { id:"messages",     label:"Messages",       icon:"💬" },
     { id:"allworkflows", label:"Workflows",      icon:"⚡" },
     { id:"deadlines",    label:"Deadlines",      icon:"📅" },
     { id:"templates",    label:"Templates",      icon:"🗂" },
@@ -3150,7 +3550,7 @@ export default function App() {
     { id:"settings",     label:"Settings",       icon:"⚙" },
   ];
 
-  const onSelect = c => { setSelected(c); setView("client"); };
+  const onSelect = (c, initialTab) => { setSelected({...c, _initialTab: initialTab}); setView("client"); };
 
   // ── Loading / error states ──────────────────────────────────────────────────
   if (loading) return (
@@ -3203,6 +3603,9 @@ export default function App() {
                 {item.id==="dashboard"&&urgent>0 && (
                   <span style={{ background:C.red, color:"white", fontSize:10, fontWeight:700, padding:"1px 6px", borderRadius:10 }}>{urgent}</span>
                 )}
+                {item.id==="messages"&&unreadMsgs>0 && (
+                  <span style={{ background:C.primary, color:"white", fontSize:10, fontWeight:700, padding:"1px 6px", borderRadius:10 }}>{unreadMsgs}</span>
+                )}
               </button>
             );
           })}
@@ -3227,7 +3630,8 @@ export default function App() {
       <div style={{ flex:1, padding:"28px 32px", overflowY:"auto", maxWidth:1000 }}>
         {view==="dashboard"    && <Dashboard clients={clients} onSelect={onSelect} setView={setView} onAddClient={onAddClient} />}
         {view==="clients"      && <ClientList clients={clients} onSelect={onSelect} />}
-        {view==="client"       && selected && <ClientWorkspace client={selected} onBack={() => { setSelected(null); setView("dashboard"); }} onRefresh={onRefresh} />}
+        {view==="messages"     && <MessagesPage onSelectClient={(clientId, tab) => { const c = clients.find(cl=>cl.id===clientId); if(c) onSelect(c, tab); }} />}
+        {view==="client"       && selected && <ClientWorkspace client={selected} initialTab={selected._initialTab} onBack={() => { setSelected(null); setView("dashboard"); }} onRefresh={onRefresh} />}
         {view==="allworkflows" && <AllWorkflows clients={clients} onSelectClient={onSelect} />}
         {view==="deadlines"    && <DeadlinesView clients={clients} onSelectClient={onSelect} />}
         {view==="templates"    && <WorkflowTemplates />}
