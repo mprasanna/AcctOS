@@ -1206,24 +1206,29 @@ function WorkflowTab({ wf, wfComputed, client, stageCfg, onRefresh }) {
   );
 }
 
-// ─── TASKS TAB (wired to DB) ──────────────────────────────────────────────────
+// ─── TASKS TAB (wired to DB, grouped by stage) ───────────────────────────────
+const STAGE_NAMES = {
+  1:"Bookkeeping", 2:"Document Collection", 3:"Preparation",
+  4:"Review", 5:"Filing", 6:"Confirmation"
+};
+
 function TasksTab({ wf, onRefresh }) {
   const [tasks, setTasks] = useState(wf.tasks || []);
   const [saving, setSaving] = useState(null);
+  const [collapsed, setCollapsed] = useState({}); // stage_n → bool
 
-  // Sync if wf changes
   const wfId = wf.id;
   const [lastId, setLastId] = useState(wfId);
   if (wfId !== lastId) { setTasks(wf.tasks || []); setLastId(wfId); }
 
   async function toggleTask(task) {
-    if (!task.id) return; // no DB id — do nothing
+    if (!task.id) return;
     const newStatus = task.status === "complete" ? "in_progress" : "complete";
     setSaving(task.id);
     try {
       const res = await fetch(`/api/tasks/${task.id}`, {
-        method: "PATCH", credentials: "include",
-        headers: { "Content-Type": "application/json" },
+        method:"PATCH", credentials:"include",
+        headers:{"Content-Type":"application/json"},
         body: JSON.stringify({ status: newStatus }),
       });
       if (res.ok) {
@@ -1233,38 +1238,130 @@ function TasksTab({ wf, onRefresh }) {
     } finally { setSaving(null); }
   }
 
-  const tcfg = { complete:[C.greenBg,C.green], in_progress:[C.primaryBg,C.primary], pending:["#F1F5F9",C.muted], blocked:[C.redBg,C.red], missed:[C.redBg,C.red] };
-
   if (!tasks.length)
     return <div style={{ background:C.amberBg, border:`1px solid #FCD34D`, borderRadius:8, padding:"16px 20px", fontSize:12, color:C.amber }}>⚠ No tasks loaded from database for this workflow.</div>;
 
+  // Group tasks by stage_n, preserving sort_order within each group
+  const byStage = {};
+  tasks.forEach(t => {
+    const sn = t.stage_n ?? 0;
+    if (!byStage[sn]) byStage[sn] = [];
+    byStage[sn].push(t);
+  });
+  const stageNums = Object.keys(byStage).map(Number).sort((a,b) => a-b);
+
+  const tcfg = {
+    complete:    [C.greenBg,  C.green],
+    in_progress: [C.primaryBg, C.primary],
+    pending:     ["#F1F5F9",  C.muted],
+    blocked:     [C.redBg,    C.red],
+    missed:      [C.redBg,    C.red],
+  };
+
+  // Stage status derived from its tasks
+  function stageStatus(stageTasks) {
+    if (stageTasks.every(t => t.status === "complete"))   return "complete";
+    if (stageTasks.some(t => t.status === "in_progress")) return "in_progress";
+    if (stageTasks.some(t => t.status === "blocked"))     return "blocked";
+    return "pending";
+  }
+
+  const stageCfgMap = {
+    complete:    { bg:C.greenBg,  color:C.green,   label:"Complete",     icon:"✓" },
+    in_progress: { bg:C.primaryBg,color:C.primary,  label:"In Progress",  icon:"●" },
+    blocked:     { bg:C.redBg,    color:C.red,      label:"Blocked",      icon:"🔒" },
+    pending:     { bg:"#F1F5F9",  color:C.muted,    label:"Pending",      icon:"○" },
+  };
+
+  // Summary line: X of Y complete
+  function stageSummary(stageTasks) {
+    const done  = stageTasks.filter(t => t.status === "complete").length;
+    const total = stageTasks.length;
+    return `${done}/${total} tasks complete`;
+  }
+
   return (
-    <Card>
-      {tasks.map((task, i) => {
-        const [tbg, tc] = tcfg[task.status] || tcfg.pending;
-        const isSaving  = saving === task.id;
-        const assignee  = task.assigned_user?.name || task.assigned_initials || task.who || "—";
+    <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+      {stageNums.map(sn => {
+        const stageTasks = byStage[sn];
+        const status     = stageStatus(stageTasks);
+        const scfg       = stageCfgMap[status] || stageCfgMap.pending;
+        const isOpen     = !collapsed[sn];
+        const wfStage    = (wf.stages || []).find(s => s.n === sn);
+        const stageName  = wfStage?.name || STAGE_NAMES[sn] || `Stage ${sn}`;
+
         return (
-          <div key={task.id || i} style={{ padding:"10px 16px", borderBottom:i<tasks.length-1?`1px solid ${C.border}`:"none", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-            <div style={{ display:"flex", alignItems:"flex-start", gap:10, flex:1 }}>
-              <button onClick={() => toggleTask(task)} disabled={isSaving || !task.id}
-                style={{ width:18, height:18, borderRadius:4, border:`2px solid ${task.status==="complete"?C.green:C.border}`, background:task.status==="complete"?C.green:"white", cursor:task.id?"pointer":"not-allowed", flexShrink:0, marginTop:2, display:"flex", alignItems:"center", justifyContent:"center" }}>
-                {task.status==="complete" && <span style={{ color:"white", fontSize:10, fontWeight:700 }}>✓</span>}
-                {isSaving && <span style={{ color:C.muted, fontSize:9 }}>…</span>}
-              </button>
-              <div>
-                <div style={{ fontSize:13, fontWeight:500, color:task.status==="complete"?C.muted:C.text, textDecoration:task.status==="complete"?"line-through":"none" }}>{task.title}</div>
-                <div style={{ fontSize:11, color:C.muted, marginTop:2 }}>
-                  👤 {assignee}{task.due_date||task.due ? ` · 📅 Due ${task.due_date||task.due}` : ""}
-                  {!task.id && <span style={{ color:C.amber, marginLeft:6 }}>⚠ no DB id</span>}
-                </div>
+          <div key={sn} style={{ border:`1px solid ${status==="in_progress"?C.primary:status==="complete"?"#BBF7D0":C.border}`, borderRadius:10, overflow:"hidden", background:"white" }}>
+
+            {/* Stage header — clickable to collapse */}
+            <div onClick={() => setCollapsed(p => ({...p,[sn]:!p[sn]}))}
+              style={{ display:"flex", alignItems:"center", gap:10, padding:"11px 16px", cursor:"pointer", background:status==="complete"?"#F0FDF4":status==="in_progress"?C.primaryBg:"white", borderBottom:isOpen?`1px solid ${C.border}`:"none" }}>
+
+              {/* Stage circle */}
+              <div style={{ width:26, height:26, borderRadius:"50%", background:scfg.bg, border:`2px solid ${scfg.color}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, color:scfg.color, fontWeight:700, flexShrink:0 }}>
+                {scfg.icon}
               </div>
+
+              <div style={{ flex:1 }}>
+                <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                  <span style={{ fontSize:13, fontWeight:600, color:C.text }}>Stage {sn}: {stageName}</span>
+                  <Pill label={scfg.label} bg={scfg.bg} color={scfg.color} />
+                </div>
+                <div style={{ fontSize:11, color:C.muted, marginTop:2 }}>{stageSummary(stageTasks)}</div>
+              </div>
+
+              {/* Progress bar */}
+              <div style={{ width:80, height:4, borderRadius:2, background:C.border, flexShrink:0 }}>
+                <div style={{ width:`${(stageTasks.filter(t=>t.status==="complete").length/stageTasks.length)*100}%`, height:"100%", borderRadius:2, background:scfg.color, transition:"width 0.3s" }} />
+              </div>
+
+              <span style={{ color:C.muted, fontSize:13 }}>{isOpen?"∧":"∨"}</span>
             </div>
-            <Pill label={task.status.replace("_"," ")} bg={tbg} color={tc} />
+
+            {/* Task rows */}
+            {isOpen && (
+              <div>
+                {stageTasks.map((task, i) => {
+                  const [tbg, tc] = tcfg[task.status] || tcfg.pending;
+                  const isSaving  = saving === task.id;
+                  const assignee  = task.assigned_user?.name || task.assigned_initials || task.who || "—";
+                  const isBlocked = task.status === "blocked";
+
+                  return (
+                    <div key={task.id || i}
+                      style={{ display:"flex", alignItems:"center", gap:10, padding:"9px 16px 9px 20px", borderBottom:i<stageTasks.length-1?`1px solid ${C.border}`:"none", background:isBlocked?"#FFF8F8":"white" }}>
+
+                      {/* Checkbox */}
+                      <button onClick={() => !isBlocked && toggleTask(task)}
+                        disabled={isSaving || !task.id || isBlocked}
+                        style={{ width:18, height:18, borderRadius:4, border:`2px solid ${task.status==="complete"?C.green:isBlocked?C.red:C.border}`, background:task.status==="complete"?C.green:"white", cursor:task.id&&!isBlocked?"pointer":"not-allowed", flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center" }}>
+                        {task.status==="complete" && <span style={{ color:"white", fontSize:10, fontWeight:700 }}>✓</span>}
+                        {isSaving && <span style={{ color:C.muted, fontSize:9 }}>…</span>}
+                        {isBlocked && <span style={{ fontSize:9 }}>🔒</span>}
+                      </button>
+
+                      {/* Task info */}
+                      <div style={{ flex:1 }}>
+                        <div style={{ fontSize:13, color:task.status==="complete"?C.muted:isBlocked?C.red:C.text, textDecoration:task.status==="complete"?"line-through":"none", fontWeight:task.status==="in_progress"?600:400 }}>
+                          {task.title}
+                        </div>
+                        <div style={{ fontSize:11, color:C.muted, marginTop:1, display:"flex", gap:10 }}>
+                          <span>👤 {assignee}</span>
+                          {(task.due_date||task.due) && <span>📅 {task.due_date||task.due}</span>}
+                          {!task.id && <span style={{ color:C.amber }}>⚠ no DB id</span>}
+                        </div>
+                      </div>
+
+                      <Pill label={task.status.replace("_"," ")} bg={tbg} color={tc} />
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         );
       })}
-    </Card>
+    </div>
   );
 }
 
