@@ -2358,53 +2358,144 @@ function BillingRatesSection() {
 
 // ─── WORKFLOW TEMPLATES ───────────────────────────────────────────────────────
 function WorkflowTemplates() {
-  const gstStages = [
-    { name:"Data Ready",          who:"Accountant (KS/JR)",  task:"Confirm bookkeeping complete in QBO",                gate:"blocked",  gateText:"Hard block — Stage 2 cannot start until bookkeeping is confirmed" },
-    { name:"Document Collection", who:"Admin (RH)",           task:"Request documents per client-type checklist",        gate:"blocked",  gateText:"Hard block — Stage 3 locked until all docs received; auto-reminders Day 3 & 6; escalate on Reminder #2" },
-    { name:"Preparation",         who:"Accountant (KS/JR)",  task:"Calculate GST + prepare draft return",               gate:"info",     gateText:"Branch: Corporation → ITC reconciliation required; Sole prop → simplified checklist; high-risk client → senior auto-assigned" },
-    { name:"Review",              who:"Senior CPA (PW)",      task:"Review draft return and approve",                    gate:"info",     gateText:"GST > $10,000 → dual review gate (both accountant + senior must approve); refund claim → justification doc required" },
-    { name:"Filing",              who:"Accountant (KS/JR)",  task:"Submit return to CRA",                               gate:"blocked",  gateText:"Hard block — filing is disabled until Stage 4 review is fully approved" },
-    { name:"Confirmation",        who:"Accountant (KS/JR)",  task:"Record CRA confirmation number → workflow closes",   gate:"complete", gateText:"Auto-notifies firm owner on completion; workflow marked Complete" },
-  ];
+  const [active, setActive] = useState("GST/HST");
+
+  const TEMPLATES = {
+    "GST/HST": {
+      freq: "Monthly / Quarterly / Annual",
+      tasks: 11,
+      docs_corp: 6, docs_sole: 3,
+      note: "Corporation: ITC reconciliation + dual review if GST > $10,000. Sole prop: simplified checklist.",
+      stages: [
+        { name:"Bookkeeping",         who:"Accountant",   task:"Reconcile QBO + confirm bank feeds",              gate:"blocked",  gateText:"Hard block — bookkeeping must be confirmed in QBO before doc collection begins" },
+        { name:"Document Collection", who:"Admin",         task:"Request docs per client-type checklist",          gate:"blocked",  gateText:"Hard block — Stage 3 locked until all docs received. Auto-reminders Day 3 & 6. Owner CC'd on Reminder #2" },
+        { name:"Preparation",         who:"Accountant",   task:"ITC reconciliation (Corp) · revenue check (Sole prop) · calculate GST", gate:"info", gateText:"Corp: ITC reconciliation required. Sole prop: annual revenue threshold check. High-risk: senior auto-assigned" },
+        { name:"Review",              who:"Senior CPA",   task:"Review return · approve or reject",               gate:"info",     gateText:"GST > $10,000: dual review gate — both accountant + senior must approve. Refund: justification doc required" },
+        { name:"Filing",              who:"Accountant",   task:"Submit return to CRA via My Business Account",    gate:"blocked",  gateText:"Hard block — Stage 4 review must be fully approved before filing is enabled" },
+        { name:"Confirmation",        who:"Accountant",   task:"Record CRA confirmation number → workflow closes",gate:"complete", gateText:"CRA confirmation number required. Workflow marked Complete. Event logged. Dashboard updates." },
+      ],
+    },
+    "T1": {
+      freq: "Annual — January to April",
+      tasks: 17,
+      docs_corp: 10, docs_sole: 9,
+      note: "T183 authorization form required at Stage 5 before EFILE. Dual review if refund > $5,000 or balance > $2,000.",
+      stages: [
+        { name:"Document Collection", who:"Admin",         task:"Send organizer · chase T4/T5/slips · confirm RRSP room", gate:"blocked", gateText:"Hard block — all slips and receipts must be received. Auto-reminders Day 3 and Day 10" },
+        { name:"Organizer Review",    who:"Accountant",   task:"Review completed organizer · flag rental, business, foreign income", gate:"info", gateText:"Check for TFSA/RRSP over-contributions · flag unusual items · prior-year changes" },
+        { name:"Preparation",         who:"Accountant",   task:"Prepare T1 in tax software · apply all slips and carryforwards", gate:"info", gateText:"Apply capital loss carryforwards · CCA schedule · home office if self-employed" },
+        { name:"Review",              who:"Senior CPA",   task:"Senior review · cross-check against prior year",  gate:"info",     gateText:"Refund > $5,000 or balance > $2,000: dual review required. Cross-check all slips." },
+        { name:"Client Approval",     who:"Admin",        task:"Send T183 for client signature · confirm refund/balance", gate:"blocked", gateText:"Hard block — T183 authorization form must be received (uploaded via portal or scanned) before EFILE" },
+        { name:"Filing & Confirmation",who:"Accountant",  task:"EFILE to CRA · record NETFILE confirmation number", gate:"complete", gateText:"NETFILE confirmation number required. Send copy to client. Workflow marked Complete." },
+      ],
+    },
+    "T2": {
+      freq: "Annual — 6 months after fiscal year end",
+      tasks: 21,
+      docs_corp: 10, docs_sole: 0,
+      note: "Corporation only. Financial statements prepared before the T2. SR&ED and SBD calculation included.",
+      stages: [
+        { name:"Year-End Bookkeeping",  who:"Senior Accountant", task:"Post adjusting entries · reconcile balance sheet · CCA review", gate:"blocked", gateText:"All year-end entries must be posted. Balance sheet fully reconciled. Payroll reconciled to T4/GL." },
+        { name:"Document Collection",   who:"Admin",             task:"Collect minute book, share registry, prior T2, loan schedules", gate:"blocked", gateText:"Hard block — minute book, share registry, prior year T2 and NOA must all be received" },
+        { name:"Financial Statements",  who:"Senior / Owner",    task:"Prepare draft financials · internal review · send to client",   gate:"blocked", gateText:"Draft financial statements must be internally reviewed and sent to client before T2 preparation" },
+        { name:"T2 Preparation",        who:"Senior Accountant", task:"Complete T2 · GIFI schedules · SR&ED · SBD calculation",       gate:"blocked", gateText:"Financial statements must be complete. GIFI schedules, small business deduction, SR&ED if applicable." },
+        { name:"Review & Approval",     who:"Owner",             task:"Full senior review of all schedules · client sign-off",         gate:"blocked", gateText:"Owner review of all T2 schedules and GIFI. Client approval required before filing." },
+        { name:"Filing & Confirmation", who:"Senior Accountant", task:"EFILE T2 · record confirmation · send copy to client",          gate:"complete", gateText:"CRA confirmation number required. Send filed return and financials to client. Workflow Complete." },
+      ],
+    },
+    "Payroll": {
+      freq: "Monthly / Bi-weekly (remitter type dependent)",
+      tasks: 13,
+      docs_corp: 5, docs_sole: 2,
+      note: "HARD deadline — late remittances compound with penalties. PD7A must be verified against CRA Payroll Tables.",
+      stages: [
+        { name:"Payroll Processing",     who:"Accountant",   task:"Run payroll · confirm hours, salaries, new hires, terminations", gate:"blocked", gateText:"All employee hours and salaries confirmed. New hires and terminations verified." },
+        { name:"Deduction Calculation",  who:"Accountant",   task:"Calculate CPP (employee + employer) · EI (×1.4) · income tax",  gate:"blocked", gateText:"CPP, EI, and income tax calculated per CRA tables. YTD maximums checked." },
+        { name:"T4/RL-1 Review",         who:"Senior CPA",   task:"Cross-check deductions against CRA Payroll Tables",             gate:"blocked", gateText:"Deductions verified against CRA tables. YTD CPP/EI maximums not exceeded." },
+        { name:"Remittance Preparation", who:"Accountant",   task:"Prepare PD7A · confirm total against GL balance",               gate:"blocked", gateText:"PD7A form prepared. Remittance total confirmed against general ledger balance." },
+        { name:"CRA Payment",            who:"Accountant",   task:"Submit payment via My Business Account — HARD DEADLINE",        gate:"blocked",  gateText:"⚠ HARD DEADLINE — penalties for late remittance. Submit via My Business Account or financial institution." },
+        { name:"Confirmation",           who:"Accountant",   task:"Record CRA payment confirmation · reconcile to GL",             gate:"complete", gateText:"Payment confirmation number recorded. Reconcile payroll remittance to general ledger." },
+      ],
+    },
+    "Bookkeeping": {
+      freq: "Monthly",
+      tasks: 14,
+      docs_corp: 4, docs_sole: 2,
+      note: "Sign-off at Stage 6 auto-advances GST Stage 1 for any linked GST workflow. No CRA filing deadline.",
+      stages: [
+        { name:"Transaction Import",  who:"Accountant",       task:"Confirm QBO bank feeds live · import missing transactions", gate:"blocked", gateText:"All bank and credit card feeds imported and up to date in QBO. No missing transactions." },
+        { name:"Categorisation",      who:"Accountant",       task:"Categorise all transactions · flag unusual items",          gate:"blocked", gateText:"Zero uncategorised transactions remaining. Large or unusual items flagged for review." },
+        { name:"Bank Reconciliation", who:"Accountant",       task:"Reconcile all accounts to bank statements",                 gate:"blocked", gateText:"All accounts reconciled. Zero unreconciled items. Chequing, savings, credit cards all match." },
+        { name:"Review",              who:"Senior Accountant",task:"Review P&L and balance sheet · flag variances > 20%",       gate:"info",    gateText:"P&L compared to prior month. Variances > 20% flagged. AP/AR aging reviewed." },
+        { name:"Adjusting Entries",   who:"Accountant",       task:"Post depreciation · prepaid amortisation · accruals",       gate:"blocked", gateText:"All adjusting entries posted: CCA/depreciation, prepaid amortisation, accruals (payroll, rent)." },
+        { name:"Sign-off",            who:"Senior Accountant",task:"Final sign-off · export P&L and balance sheet",             gate:"complete", gateText:"✓ Books signed off. Linked GST workflow Stage 1 auto-advances. P&L and balance sheet exported." },
+      ],
+    },
+  };
+
   const gateStyle = {
     blocked:  { bg:"#FFF1F2", border:"#FECDD3", color:C.red,     icon:"🔒" },
     info:     { bg:"#EFF6FF", border:"#BFDBFE", color:C.primary, icon:"⑂"  },
     complete: { bg:C.greenBg, border:"#BBF7D0", color:C.green,   icon:"✓"  },
   };
-  const upcoming = [
-    { name:"Personal Tax Return (T1)", phase:"Phase 2", note:"Highest volume. T4/T5 tracking, seasonal surge Jan–Apr." },
-    { name:"Corporate Tax (T2)",        phase:"Phase 2", note:"Year-end based. High-value clients, complex coordination." },
-    { name:"Monthly Bookkeeping",       phase:"Phase 2", note:"Feeds Stage 1 of GST workflow automatically." },
-    { name:"Payroll Remittances",       phase:"Phase 3", note:"CRA payroll deadlines. Penalty-sensitive." },
-  ];
+
+  const tabOrder = ["GST/HST","T1","T2","Payroll","Bookkeeping"];
+  const t = TEMPLATES[active];
+
   return (
     <div>
-      <SectionHead title="Workflow Templates" sub="One engine, configurable templates — adding T1 in Phase 2 means a new template file, not a new system" />
+      <SectionHead title="Workflow Templates" sub="5 filing types · same engine · same 6-stage structure · all live" />
 
-      {/* Live template — GST/HST */}
-      <div style={{ marginBottom:10, display:"flex", alignItems:"center", gap:8 }}>
-        <span style={{ fontSize:13, fontWeight:700, color:C.text }}>GST/HST Filing</span>
-        <Pill label="Phase 1 — Live" bg={C.greenBg} color={C.green} />
-        <span style={{ fontSize:12, color:C.muted }}>Monthly / Quarterly / Annual</span>
+      {/* Tab selector */}
+      <div style={{ display:"flex", gap:0, marginBottom:20, borderBottom:`1px solid ${C.border}` }}>
+        {tabOrder.map(name => (
+          <button key={name} onClick={() => setActive(name)}
+            style={{ background:"none", border:"none", borderBottom:active===name?`2px solid ${C.primary}`:"2px solid transparent",
+              padding:"8px 16px", cursor:"pointer", fontSize:13, fontWeight:active===name?600:400,
+              color:active===name?C.primary:C.muted, marginBottom:-1, whiteSpace:"nowrap" }}>
+            {name}
+          </button>
+        ))}
       </div>
-      <div style={{ display:"flex", flexDirection:"column", gap:6, marginBottom:28 }}>
-        {gstStages.map((s, i) => {
+
+      {/* Template header */}
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:14, flexWrap:"wrap", gap:10 }}>
+        <div>
+          <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:4 }}>
+            <span style={{ fontSize:15, fontWeight:700, color:C.text }}>{active}</span>
+            <Pill label="✓ Live" bg={C.greenBg} color={C.green} />
+            <span style={{ fontSize:12, color:C.muted }}>{t.freq}</span>
+          </div>
+          <div style={{ fontSize:12, color:C.muted }}>{t.note}</div>
+        </div>
+        <div style={{ display:"flex", gap:8, flexShrink:0 }}>
+          <Pill label={`${t.tasks} tasks`}     bg="#F1F5F9" color={C.text} />
+          <Pill label={`Corp: ${t.docs_corp} docs`}  bg="#F1F5F9" color={C.muted} />
+          {t.docs_sole > 0 && <Pill label={`Sole prop: ${t.docs_sole} docs`} bg="#F1F5F9" color={C.muted} />}
+        </div>
+      </div>
+
+      {/* Stage timeline */}
+      <div style={{ display:"flex", flexDirection:"column", gap:6, marginBottom:16 }}>
+        {t.stages.map((s, i) => {
           const gs = gateStyle[s.gate];
           return (
             <div key={i} style={{ display:"flex", gap:0, alignItems:"stretch" }}>
-              {/* Stage number + connector */}
               <div style={{ display:"flex", flexDirection:"column", alignItems:"center", width:32, flexShrink:0 }}>
-                <div style={{ width:26, height:26, borderRadius:"50%", background:C.primaryBg, color:C.primary, fontSize:11, fontWeight:700, display:"flex", alignItems:"center", justifyContent:"center", border:`2px solid ${C.primary}`, flexShrink:0 }}>{i+1}</div>
-                {i < gstStages.length-1 && <div style={{ width:2, flex:1, minHeight:10, background:C.border, margin:"3px 0" }} />}
+                <div style={{ width:26, height:26, borderRadius:"50%", background:C.primaryBg, color:C.primary,
+                  fontSize:11, fontWeight:700, display:"flex", alignItems:"center", justifyContent:"center",
+                  border:`2px solid ${C.primary}`, flexShrink:0 }}>{i+1}</div>
+                {i < t.stages.length-1 && <div style={{ width:2, flex:1, minHeight:10, background:C.border, margin:"3px 0" }} />}
               </div>
-              {/* Stage content */}
               <div style={{ flex:1, background:"white", border:`1px solid ${C.border}`, borderRadius:8, padding:"10px 14px", marginLeft:8, marginBottom:2 }}>
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:4 }}>
                   <div>
                     <span style={{ fontSize:13, fontWeight:600, color:C.text }}>{s.name}</span>
                     <span style={{ fontSize:11, color:C.muted, marginLeft:8 }}>· {s.task}</span>
                   </div>
-                  <span style={{ fontSize:11, color:C.muted, background:"#F1F5F9", padding:"2px 8px", borderRadius:6, whiteSpace:"nowrap", marginLeft:8 }}>👤 {s.who}</span>
+                  <span style={{ fontSize:11, color:C.muted, background:"#F1F5F9", padding:"2px 8px", borderRadius:6, whiteSpace:"nowrap", marginLeft:8 }}>
+                    👤 {s.who}
+                  </span>
                 </div>
                 <div style={{ background:gs.bg, border:`1px solid ${gs.border}`, borderRadius:6, padding:"5px 10px", display:"flex", gap:6, alignItems:"flex-start" }}>
                   <span style={{ fontSize:11, flexShrink:0 }}>{gs.icon}</span>
@@ -2416,22 +2507,8 @@ function WorkflowTemplates() {
         })}
       </div>
 
-      {/* Upcoming templates */}
-      <div style={{ fontSize:12, fontWeight:600, color:C.muted, textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:10 }}>Coming Next</div>
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
-        {upcoming.map((t, i) => (
-          <div key={i} style={{ background:"white", border:`1px solid ${C.border}`, borderRadius:8, padding:"12px 14px" }}>
-            <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:4 }}>
-              <span style={{ fontSize:13, fontWeight:600, color:C.text }}>{t.name}</span>
-              <Pill label={t.phase} bg={t.phase==="Phase 2"?C.amberBg:"#F1F5F9"} color={t.phase==="Phase 2"?C.amber:C.muted} />
-            </div>
-            <div style={{ fontSize:12, color:C.muted }}>{t.note}</div>
-          </div>
-        ))}
-      </div>
-
-      <div style={{ marginTop:16, background:"#F0F9FF", border:"1px solid #BAE6FD", borderRadius:8, padding:"10px 14px", fontSize:12, color:"#0369A1" }}>
-        Every template uses the same At Risk engine (C1–C5), the same gate enforcement, and the same stage structure. Templates configure the rules — the engine runs identically.
+      <div style={{ background:"#F0F9FF", border:"1px solid #BAE6FD", borderRadius:8, padding:"10px 14px", fontSize:12, color:"#0369A1" }}>
+        Every template uses the same At Risk engine (C1–C5), the same gate enforcement, and the same 6-stage structure. Templates configure the rules — the engine runs identically across all 5 filing types.
       </div>
     </div>
   );
