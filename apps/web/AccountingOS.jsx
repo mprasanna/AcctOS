@@ -594,12 +594,6 @@ function GateBanner({ gate }) {
         <span style={{ fontSize:12, color:cfg.color }}>{text}</span>
       </div>
     </div>
-    {showAddClient && (
-      <AddClientModal
-        onClose={() => setShowAddClient(false)}
-        onSaved={() => { setShowAddClient(false); onRefresh(); }}
-      />
-    )}
   );
 }
 
@@ -1965,5 +1959,11 @@ export default function App() {
         {view==="settings"     && <SettingsPage />}
       </div>
     </div>
+    {showAddClient && (
+      <AddClientModal
+        onClose={() => setShowAddClient(false)}
+        onSaved={() => { setShowAddClient(false); onRefresh(); }}
+      />
+    )}
   );
 }
