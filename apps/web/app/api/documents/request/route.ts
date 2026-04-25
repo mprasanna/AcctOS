@@ -85,6 +85,20 @@ export async function POST(req: NextRequest) {
 
   const firmName = firmData?.name ?? 'Your Accounting Firm'
 
+  // Load firm settings to check doc_reminder_send_to_client flag
+  const { data: firmSettings } = await supabase
+    .from('firm_settings')
+    .select('doc_reminder_send_to_client')
+    .eq('firm_id', workflow.firm_id)
+    .single()
+
+  // Load the client record to get client_email (if sending direct to client)
+  const { data: clientRecord } = await supabase
+    .from('clients')
+    .select('id, name, client_email')
+    .eq('id', workflow.client_id)
+    .single()
+
   // Get the assigned accountant (for reminder context) and firm owner (for escalation)
   const [assignedResult, ownerResult] = await Promise.all([
     workflow.client?.assigned_to
@@ -95,6 +109,7 @@ export async function POST(req: NextRequest) {
 
   const assignedUser = assignedResult.data
   const ownerUser    = ownerResult.data
+  const sendToClient = firmSettings?.doc_reminder_send_to_client ?? false
 
   // Determine reminder number from type string ("Reminder #1", "Reminder #2", etc.)
   const reminderMatch   = type.match(/#(\d+)/)
@@ -104,20 +119,31 @@ export async function POST(req: NextRequest) {
   const pendingDocNames = (recentDocs ?? []).map(d => d.name)
 
   // Send reminder to accountant (they contact the client directly; Phase 4 adds client portal)
-  const recipientEmail = assignedUser?.email ?? ownerUser?.email
-  const recipientName  = assignedUser?.name  ?? ownerUser?.name ?? 'Accountant'
+  // Route: send directly to client email if flag is on AND client has an email
+  const clientDirectEmail = sendToClient && clientRecord?.client_email
+  const recipientEmail = clientDirectEmail
+    ? clientRecord!.client_email!
+    : (assignedUser?.email ?? ownerUser?.email)
+  const recipientName = clientDirectEmail
+    ? (clientRecord?.name ?? 'Client')
+    : (assignedUser?.name ?? ownerUser?.name ?? 'Accountant')
+  // Always CC the assigned accountant when sending direct to client
+  const ccEmail = clientDirectEmail ? (assignedUser?.email ?? null) : null
 
   let emailResult = { messageId: null as string | null, error: null as string | null }
 
   if (recipientEmail) {
     emailResult = await sendDocReminder({
-      to:             recipientEmail,
-      clientName:     workflow.client?.name ?? 'Client',
+      to:             ccEmail ? [recipientEmail, ccEmail] : recipientEmail,
+      clientName:     clientRecord?.name ?? workflow.client?.name ?? 'Client',
       firmName,
       workflowLabel:  workflow.label,
       deadline:       workflow.deadline,
       pendingDocs:    pendingDocNames,
       reminderNumber: reminderNumber as 1 | 2,
+      uploadLink:     clientRecord?.client_email
+        ? `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://acct-os.vercel.app'}/portal/upload?client=${workflow.client_id}`
+        : undefined,
     })
   }
 

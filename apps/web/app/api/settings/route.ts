@@ -83,6 +83,8 @@ export async function PATCH(req: NextRequest) {
     'notify_owner_on_escalation',
     'notify_assigned_on_advance',
     'dual_review_threshold',
+    'require_upload_to_receive',
+    'doc_reminder_send_to_client',
   ]
 
   const firmPatch: Record<string, unknown>     = {}

@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
           stages ( * ),
           tasks ( id, title, status, stage_n, due_date, sort_order, assigned_to,
                   assigned_user:users!tasks_assigned_to_fkey ( id, name, initials ) ),
-          documents ( id, name, status, reminder_count, last_reminder_at, uploaded_at, upload_source )
+          documents ( id, name, status, reminder_count, last_reminder_at, uploaded_at, upload_source, upload_required )
         )
       `)
 
@@ -131,7 +131,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json()
-  const { name, type, freq, city, since, bn, assigned_to, net_gst } = body
+  const { name, type, freq, city, since, bn, assigned_to, net_gst, client_email, client_phone } = body
 
   // Basic validation
   if (!name || !type || !freq) {
@@ -171,16 +171,18 @@ export async function POST(req: NextRequest) {
     const { data: newClient, error } = await supabase
       .from('clients')
       .insert({
-        firm_id:     userRow.firm_id,
+        firm_id:      userRow.firm_id,
         name,
         type,
         freq,
-        city:        city ?? null,
-        since:       since ?? null,
-        bn:          bn ?? null,
-        initials:    name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2),
-        assigned_to: assigned_to ?? null,
-        net_gst:     net_gst ?? null,
+        city:         city ?? null,
+        since:        since ?? null,
+        bn:           bn ?? null,
+        initials:     name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2),
+        assigned_to:  assigned_to ?? null,
+        net_gst:      net_gst ?? null,
+        client_email: client_email ?? null,
+        client_phone: client_phone ?? null,
         risk_history: false,
         penalty_risk: null,
       })

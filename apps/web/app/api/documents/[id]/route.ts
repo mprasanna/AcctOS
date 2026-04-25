@@ -21,6 +21,23 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
   const body = await req.json()
   const { status, upload_source } = body
 
+  // ── Fetch the document to check upload_required ──────────────────────────
+  const { data: existingDoc } = await supabase
+    .from('documents')
+    .select('id, upload_required, storage_path, workflow_id, firm_id')
+    .eq('id', params.id)
+    .single()
+
+  // ── Enforce upload_required: cannot mark received without a file ──────────
+  if (status === 'received' && existingDoc?.upload_required) {
+    if (!existingDoc.storage_path) {
+      return NextResponse.json({
+        error: 'This document requires a file upload before it can be marked received. Upload the file first.',
+        code: 'UPLOAD_REQUIRED',
+      }, { status: 409 })
+    }
+  }
+
   const patch: Record<string, unknown> = {}
   if (status)        patch.status = status
   if (upload_source) patch.upload_source = upload_source
