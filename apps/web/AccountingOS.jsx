@@ -594,6 +594,12 @@ function GateBanner({ gate }) {
         <span style={{ fontSize:12, color:cfg.color }}>{text}</span>
       </div>
     </div>
+    {showAddClient && (
+      <AddClientModal
+        onClose={() => setShowAddClient(false)}
+        onSaved={() => { setShowAddClient(false); onRefresh(); }}
+      />
+    )}
   );
 }
 
@@ -611,17 +617,171 @@ function getStageActor(stageN, client) {
   return actors[stageN] || { action: "Advance stage", role: "Accountant", who: "KS / JR" };
 }
 
+// ─── ADD CLIENT MODAL ────────────────────────────────────────────────────────
+const WF_TYPES = ["GST/HST","T2","T1","Payroll","Bookkeeping"];
+const CLIENT_TYPES = ["Corporation","Sole prop","Partnership"];
+const FREQ_OPTIONS = ["Monthly","Quarterly","Annual"];
+
+function AddClientModal({ onClose, onSaved }) {
+  const [step, setStep]   = useState(1); // 1=client info, 2=workflow
+  const [saving, setSaving] = useState(false);
+  const [error, setError]   = useState(null);
+  const [newClientId, setNewClientId] = useState(null);
+
+  const [form, setForm] = useState({
+    name:"", type:"Corporation", freq:"Monthly", city:"", since: new Date().getFullYear().toString(), bn:"", net_gst:"",
+  });
+  const [wfForm, setWfForm] = useState({
+    type:"GST/HST", period:"", deadline:"", cycle_start:"",
+  });
+
+  function setF(k,v){ setForm(p=>({...p,[k]:v})); }
+  function setW(k,v){ setWfForm(p=>({...p,[k]:v})); }
+
+  async function saveClient() {
+    if (!form.name.trim()) { setError("Client name is required."); return; }
+    setSaving(true); setError(null);
+    try {
+      const res = await fetch("/api/clients", {
+        method:"POST", credentials:"include",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ ...form, net_gst: form.net_gst ? Number(form.net_gst) : null }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error || "Failed to create client."); return; }
+      setNewClientId(data.id);
+      setStep(2);
+    } catch(e){ setError("Network error."); }
+    finally{ setSaving(false); }
+  }
+
+  async function saveWorkflow() {
+    if (!wfForm.type || !wfForm.period || !wfForm.deadline || !wfForm.cycle_start) {
+      setError("All workflow fields are required."); return;
+    }
+    setSaving(true); setError(null);
+    try {
+      const res = await fetch("/api/workflows", {
+        method:"POST", credentials:"include",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ client_id: newClientId, ...wfForm }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error || "Failed to create workflow."); return; }
+      onSaved(); onClose();
+    } catch(e){ setError("Network error."); }
+    finally{ setSaving(false); }
+  }
+
+  const inp = (label, key, formObj, setFn, type="text", opts=null) => (
+    <div key={key}>
+      <label style={{ display:"block", fontSize:11, fontWeight:600, color:C.muted, marginBottom:4, textTransform:"uppercase", letterSpacing:"0.05em" }}>{label}</label>
+      {opts
+        ? <select value={formObj[key]} onChange={e=>setFn(key,e.target.value)}
+            style={{ width:"100%", padding:"8px 10px", borderRadius:8, border:`1px solid ${C.border}`, fontSize:13, outline:"none", background:"white" }}>
+            {opts.map(o=><option key={o}>{o}</option>)}
+          </select>
+        : <input type={type} value={formObj[key]} onChange={e=>setFn(key,e.target.value)}
+            style={{ width:"100%", padding:"8px 10px", borderRadius:8, border:`1px solid ${C.border}`, fontSize:13, outline:"none", boxSizing:"border-box" }} />
+      }
+    </div>
+  );
+
+  return (
+    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.4)", zIndex:100, display:"flex", alignItems:"center", justifyContent:"center" }}>
+      <div style={{ background:"white", borderRadius:14, padding:"28px 32px", width:480, maxHeight:"85vh", overflowY:"auto", boxShadow:"0 20px 60px rgba(0,0,0,0.2)" }}>
+        {/* Header */}
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20 }}>
+          <div>
+            <div style={{ fontSize:16, fontWeight:700, color:C.text }}>Add New Client</div>
+            <div style={{ fontSize:12, color:C.muted, marginTop:2 }}>Step {step} of 2 — {step===1?"Client Info":"First Workflow"}</div>
+          </div>
+          <button onClick={onClose} style={{ background:"none", border:"none", fontSize:20, color:C.muted, cursor:"pointer" }}>×</button>
+        </div>
+
+        {/* Step indicator */}
+        <div style={{ display:"flex", gap:6, marginBottom:20 }}>
+          {[1,2].map(s=>(
+            <div key={s} style={{ flex:1, height:4, borderRadius:2, background:step>=s?C.primary:C.border }} />
+          ))}
+        </div>
+
+        {error && <div style={{ background:C.redBg, border:`1px solid #FCA5A5`, borderRadius:8, padding:"8px 12px", fontSize:12, color:C.red, marginBottom:14 }}>{error}</div>}
+
+        {step===1 && (
+          <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+            {inp("Client / Business Name","name",form,setF)}
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+              {inp("Entity Type","type",form,setF,"text",CLIENT_TYPES)}
+              {inp("Filing Frequency","freq",form,setF,"text",FREQ_OPTIONS)}
+            </div>
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+              {inp("City","city",form,setF)}
+              {inp("Client Since (year)","since",form,setF)}
+            </div>
+            {inp("CRA Business Number (BN)","bn",form,setF)}
+            {inp("Net GST Amount (optional)","net_gst",form,setF,"number")}
+            <div style={{ display:"flex", justifyContent:"flex-end", gap:8, marginTop:6 }}>
+              <Btn onClick={onClose}>Cancel</Btn>
+              <button onClick={saveClient} disabled={saving}
+                style={{ background:C.primary, color:"white", border:"none", borderRadius:8, padding:"8px 18px", fontSize:13, fontWeight:600, cursor:saving?"not-allowed":"pointer", opacity:saving?0.7:1 }}>
+                {saving?"Saving…":"Next: Add Workflow →"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {step===2 && (
+          <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+            <div style={{ background:C.greenBg, border:"1px solid #BBF7D0", borderRadius:8, padding:"8px 12px", fontSize:12, color:"#14532D" }}>
+              ✓ Client created. Now add their first workflow — stages and tasks will be created automatically from the template.
+            </div>
+            {inp("Workflow Type","type",wfForm,setW,"text",WF_TYPES)}
+            {inp("Period Label","period",wfForm,setW,"text")}
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+              {inp("Cycle Start","cycle_start",wfForm,setW,"date")}
+              {inp("CRA Deadline","deadline",wfForm,setW,"date")}
+            </div>
+            <div style={{ background:"#F0F9FF", border:"1px solid #BAE6FD", borderRadius:8, padding:"8px 12px", fontSize:11, color:"#0369A1" }}>
+              💡 Stages, tasks, and document checklist will be auto-generated from the {wfForm.type} template for a {form.type}.
+            </div>
+            <div style={{ display:"flex", justifyContent:"space-between", gap:8, marginTop:6 }}>
+              <Btn onClick={() => { onSaved(); onClose(); }}>Skip workflow for now</Btn>
+              <button onClick={saveWorkflow} disabled={saving}
+                style={{ background:C.green, color:"white", border:"none", borderRadius:8, padding:"8px 18px", fontSize:13, fontWeight:600, cursor:saving?"not-allowed":"pointer", opacity:saving?0.7:1 }}>
+                {saving?"Creating…":"Create Workflow ✓"}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── DASHBOARD ────────────────────────────────────────────────────────────────
-function Dashboard({ clients, onSelect, setView }) {
+function Dashboard({ clients, onSelect, setView, onAddClient }) {
+  const [wfTypeFilter, setWfTypeFilter] = useState("All");
+
+  // Collect all unique workflow types across all clients
+  const allWfTypes = ["All", ...Array.from(new Set(
+    clients.flatMap(c => (c.workflows||[]).map(w => w.type))
+  )).sort()];
+
+  // Filter clients by workflow type
+  const filteredClients = wfTypeFilter === "All"
+    ? clients
+    : clients.filter(c => (c.workflows||[]).some(w => w.type === wfTypeFilter));
+
   const cnt = {
-    all:      clients.length,
-    ontrack:  clients.filter(c => c.status==="On Track").length,
-    atrisk:   clients.filter(c => c.status==="At Risk").length,
-    overdue:  clients.filter(c => c.status==="Overdue").length,
-    complete: clients.filter(c => c.status==="Complete").length,
+    all:      filteredClients.length,
+    ontrack:  filteredClients.filter(c => c.status==="On Track").length,
+    atrisk:   filteredClients.filter(c => c.status==="At Risk").length,
+    overdue:  filteredClients.filter(c => c.status==="Overdue").length,
+    complete: filteredClients.filter(c => c.status==="Complete").length,
   };
-  const spotlights = clients.filter(c => c.status !== "Complete").slice(0,3);
-  const soonAtRisk = clients.filter(c => c.status==="On Track" && c.daysToDeadline!=null && c.daysToDeadline<=5 && c.daysToDeadline>=0);
+  const spotlights = filteredClients.filter(c => c.status !== "Complete").slice(0,3);
+  const soonAtRisk = filteredClients.filter(c => c.status==="On Track" && c.daysToDeadline!=null && c.daysToDeadline<=5 && c.daysToDeadline>=0);
   const tiles = [
     { label:"Active Filings", value:cnt.all-cnt.complete, color:C.primary, bg:C.primaryBg },
     { label:"On Track",       value:cnt.ontrack,  color:C.green, bg:C.greenBg },
@@ -631,13 +791,33 @@ function Dashboard({ clients, onSelect, setView }) {
 
   return (
     <div>
-      <SectionHead title="Command Centre" sub={`October 2025 · ${cnt.all} active clients · Ontario (CRA timezone)`}
+      <SectionHead title="Command Centre" sub={`${new Date().toLocaleDateString("en-CA",{month:"long",year:"numeric"})} · ${cnt.all} active clients · Ontario (CRA timezone)`}
         action={<>
+          <button onClick={onAddClient}
+            style={{ background:C.green, color:"white", border:"none", borderRadius:8, padding:"7px 14px", fontSize:13, fontWeight:600, cursor:"pointer" }}>
+            + Add Client
+          </button>
           <Btn onClick={() => setView("deadlines")}>📅 Deadlines</Btn>
           <Btn onClick={() => setView("allworkflows")}>⚡ All Workflows</Btn>
           <Btn variant="primary" onClick={() => setView("clients")}>All Clients →</Btn>
         </>}
       />
+      {/* Workflow type filter tabs */}
+      {allWfTypes.length > 2 && (
+        <div style={{ display:"flex", gap:6, marginBottom:16, flexWrap:"wrap" }}>
+          {allWfTypes.map(t => (
+            <button key={t} onClick={() => setWfTypeFilter(t)}
+              style={{ padding:"5px 14px", borderRadius:20, border:`1px solid ${wfTypeFilter===t?C.primary:C.border}`, background:wfTypeFilter===t?C.primary:"white", color:wfTypeFilter===t?"white":C.text, fontSize:12, fontWeight:wfTypeFilter===t?600:400, cursor:"pointer" }}>
+              {t}
+              {t !== "All" && (
+                <span style={{ marginLeft:5, background:wfTypeFilter===t?"rgba(255,255,255,0.25)":C.primaryBg, color:wfTypeFilter===t?"white":C.primary, fontSize:10, fontWeight:700, padding:"1px 5px", borderRadius:8 }}>
+                  {clients.filter(c=>(c.workflows||[]).some(w=>w.type===t)).length}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
       <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:12, marginBottom:20 }}>
         {tiles.map(t => (
           <div key={t.label} style={{ background:t.bg, borderRadius:12, padding:"16px 20px", border:`1px solid ${t.color}22` }}>
@@ -1683,9 +1863,11 @@ export default function App() {
   const [view, setView]         = useState("dashboard");
   const [selected, setSelected] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [showAddClient, setShowAddClient] = useState(false);
   const { clients, loading, error } = useClients(refreshKey);
   const urgent = clients.filter(c => c.status==="At Risk"||c.status==="Overdue").length;
   const onRefresh = () => setRefreshKey(k => k + 1);
+  const onAddClient = () => setShowAddClient(true);
 
   const nav = [
     { id:"dashboard",    label:"Command Centre", icon:"⊞" },
@@ -1772,7 +1954,7 @@ export default function App() {
         </div>
       </div>
       <div style={{ flex:1, padding:"28px 32px", overflowY:"auto", maxWidth:1000 }}>
-        {view==="dashboard"    && <Dashboard clients={clients} onSelect={onSelect} setView={setView} />}
+        {view==="dashboard"    && <Dashboard clients={clients} onSelect={onSelect} setView={setView} onAddClient={onAddClient} />}
         {view==="clients"      && <ClientList clients={clients} onSelect={onSelect} />}
         {view==="client"       && selected && <ClientWorkspace client={selected} onBack={() => { setSelected(null); setView("dashboard"); }} onRefresh={onRefresh} />}
         {view==="allworkflows" && <AllWorkflows clients={clients} onSelectClient={onSelect} />}

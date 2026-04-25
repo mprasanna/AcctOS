@@ -71,11 +71,13 @@ export function computeWorkflowStatus(
   const missingDocs    = docs.some(d => d.status === 'pending')
   const maxReminders   = docs.reduce((m, d) => Math.max(m, d.reminder_count ?? 0), 0)
 
-  // Complete
-  if (stage >= 6 && stages.every(s => s.status === 'complete'))
+  // Complete — check stages first, before deadline check
+  // A workflow is complete if ALL stages are complete regardless of cur_stage or deadline
+  const allStagesComplete = stages.length > 0 && stages.every(s => s.status === 'complete')
+  if (allStagesComplete || stage >= 6)
     return { status: 'Complete', flags: [], daysToDeadline }
 
-  // Overdue (deadline passed, not filed)
+  // Overdue (deadline passed, not yet filed)
   if (daysToDeadline < 0 && stage < 6)
     return { status: 'Overdue', flags: ['CRA deadline missed — file immediately'], daysToDeadline }
 
