@@ -1,5 +1,5 @@
 "use client";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 
 // ─── DESIGN TOKENS ────────────────────────────────────────────────────────────
 const C = {
@@ -1680,10 +1680,7 @@ function ActivityTab({ clientId }) {
 function InvoicesTab({ wf, client }) {
   const [invoices, setInvoices]   = useState([]);
   const [loading, setLoading]     = useState(true);
-  const [creating, setCreating]   = useState(false);
-  const [override, setOverride]   = useState("");
-  const [error, setError]         = useState(null);
-  const [success, setSuccess]     = useState(null);
+
 
   useEffect(() => {
     if (!wf?.id) return;
@@ -1693,32 +1690,7 @@ function InvoicesTab({ wf, client }) {
       .finally(() => setLoading(false));
   }, [wf?.id]);
 
-  async function createInvoice() {
-    setCreating(true); setError(null); setSuccess(null);
-    try {
-      const body = { workflow_id: wf.id };
-      if (override) body.override_amount = Math.round(parseFloat(override) * 100);
-      const res  = await fetch("/api/invoices", {
-        method:"POST", credentials:"include",
-        headers:{"Content-Type":"application/json"},
-        body: JSON.stringify(body),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setSuccess(`Invoice created — $${((data.amount_cents||0)/100).toFixed(2)} CAD sent via Stripe.`);
-        setInvoices(prev => [{
-          id: data.invoiceId,
-          event_type: "filing_invoice_created",
-          amount_cents: data.amount_cents,
-          description: data.description,
-          created_at: new Date().toISOString(),
-        }, ...prev]);
-        setOverride("");
-      } else {
-        setError(data.error || "Failed to create invoice.");
-      }
-    } finally { setCreating(false); }
-  }
+
 
   const fmtCAD = cents => `$${((cents||0)/100).toFixed(2)} CAD`;
 
@@ -1726,22 +1698,26 @@ function InvoicesTab({ wf, client }) {
     <div>
       <div style={{ fontSize:13, fontWeight:600, color:C.text, marginBottom:14 }}>Invoices — {wf?.label}</div>
 
-      {/* Create invoice */}
-      <Card style={{ padding:"16px 18px", marginBottom:14 }}>
-        <div style={{ fontSize:13, fontWeight:500, color:C.text, marginBottom:8 }}>Create invoice for this workflow</div>
-        {error && <div style={{ background:C.redBg, border:"1px solid #FCA5A5", borderRadius:7, padding:"8px 12px", fontSize:12, color:C.red, marginBottom:10 }}>{error}</div>}
-        {success && <div style={{ background:C.greenBg, border:"1px solid #BBF7D0", borderRadius:7, padding:"8px 12px", fontSize:12, color:C.green, marginBottom:10 }}>✓ {success}</div>}
-        <div style={{ display:"flex", gap:8, alignItems:"center" }}>
-          <input type="number" min="0" step="0.01" placeholder="Amount (CAD) — leave blank to use rate from Settings"
-            value={override} onChange={e => setOverride(e.target.value)}
-            style={{ flex:1, padding:"7px 10px", borderRadius:7, border:`1px solid ${C.border}`, fontSize:13 }} />
-          <button onClick={createInvoice} disabled={creating}
-            style={{ background:C.primary, color:"white", border:"none", borderRadius:7, padding:"7px 16px", fontSize:13, fontWeight:600, cursor:"pointer", opacity:creating?0.7:1, whiteSpace:"nowrap" }}>
-            {creating ? "Sending…" : "Send Invoice →"}
-          </button>
-        </div>
-        <div style={{ fontSize:11, color:C.muted, marginTop:6 }}>
-          Default rates are set in Settings → Billing → Billing Rates. Invoice is sent via Stripe to the client email on file.
+      {/* Stripe setup pending notice */}
+      <Card style={{ padding:"20px 22px", marginBottom:14, background:"#FFFBEB", border:`1px solid #FCD34D` }}>
+        <div style={{ display:"flex", gap:14, alignItems:"flex-start" }}>
+          <div style={{ fontSize:24, flexShrink:0 }}>🔗</div>
+          <div style={{ flex:1 }}>
+            <div style={{ fontSize:13, fontWeight:600, color:"#92400E", marginBottom:4 }}>Stripe integration not yet connected</div>
+            <div style={{ fontSize:12, color:"#78350F", lineHeight:1.6, marginBottom:14 }}>
+              Per-job invoicing requires a Stripe account to be connected. Once connected, you can send invoices directly from any workflow using your billing rates, or enter a custom amount.
+            </div>
+            <button
+              onClick={() => {
+                // Navigate to Settings → Billing tab
+                if (typeof window !== "undefined") {
+                  window.dispatchEvent(new CustomEvent("acct-nav", { detail: { view:"settings", tab:"billing" } }));
+                }
+              }}
+              style={{ background:C.primary, color:"white", border:"none", borderRadius:7, padding:"7px 16px", fontSize:13, fontWeight:600, cursor:"pointer" }}>
+              Set up Stripe in Settings → Billing →
+            </button>
+          </div>
         </div>
       </Card>
 
