@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
     .from('time_entries')
     .select(`
       id, task_id, user_id, started_at, stopped_at, duration_minutes,
-      note, billable, created_at,
+      note, billable, is_running, created_at,
       user:users!time_entries_user_id_fkey ( id, name, initials )
     `)
     .eq('firm_id', userRow.firm_id)
@@ -30,24 +30,23 @@ export async function GET(req: NextRequest) {
   const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // Compute elapsed for any running timers
   const enriched = (data ?? []).map(entry => {
     let minutes = entry.duration_minutes
     if (!minutes && entry.started_at) {
       const stop = entry.stopped_at ? new Date(entry.stopped_at) : new Date()
       minutes = Math.round((stop.getTime() - new Date(entry.started_at).getTime()) / 60000)
     }
-    return { ...entry, computed_minutes: minutes ?? 0, running: !entry.stopped_at && !!entry.started_at }
+    return {
+      ...entry,
+      computed_minutes: minutes ?? 0,
+      running: entry.is_running === true,
+    }
   })
 
   return NextResponse.json({ data: enriched })
 }
 
 // ─── POST /api/time-entries ───────────────────────────────────────────────────
-// Three modes:
-//   { action: 'start', workflow_id, task_id?, note? }  → starts stopwatch
-//   { action: 'stop',  entry_id }                      → stops running timer
-//   { action: 'log',   workflow_id, task_id?, duration_minutes, note? } → manual entry
 export async function POST(req: NextRequest) {
   const supabase = createSupabaseServerClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -60,36 +59,54 @@ export async function POST(req: NextRequest) {
   const body = await req.json()
   const { action, workflow_id, task_id, duration_minutes, note, entry_id, billable = true, client_id } = body
 
-  // ── START timer ─────────────────────────────────────────────────────────────
+  // ── START ────────────────────────────────────────────────────────────────────
   if (action === 'start') {
     if (!workflow_id) return NextResponse.json({ error: 'workflow_id required' }, { status: 400 })
 
-    // Stop any currently running timer for this user first
-    await supabase
+    // Stop any running timer for this user — must set is_running=false for the
+    // exclusion constraint: EXCLUDE (user_id WITH =) WHERE (is_running = true)
+    const { data: running } = await supabase
       .from('time_entries')
-      .update({ stopped_at: new Date().toISOString() })
+      .select('id, started_at')
       .eq('user_id', user.id)
       .eq('firm_id', userRow.firm_id)
-      .is('stopped_at', null)
-      .not('started_at', 'is', null)
+      .eq('is_running', true)
 
-    // Get client_id from workflow if not provided
+    if (running && running.length > 0) {
+      const now = new Date().toISOString()
+      for (const r of running) {
+        const mins = r.started_at
+          ? Math.round((Date.now() - new Date(r.started_at).getTime()) / 60000)
+          : 0
+        await supabase
+          .from('time_entries')
+          .update({ stopped_at: now, is_running: false, duration_minutes: mins })
+          .eq('id', r.id)
+      }
+    }
+
+    // Resolve client_id
     let resolvedClientId = client_id
     if (!resolvedClientId) {
-      const { data: wf } = await supabase.from('workflows').select('client_id').eq('id', workflow_id).single()
+      const { data: wf } = await supabase
+        .from('workflows').select('client_id').eq('id', workflow_id).single()
       resolvedClientId = wf?.client_id
+    }
+    if (!resolvedClientId) {
+      return NextResponse.json({ error: 'Could not resolve client_id' }, { status: 400 })
     }
 
     const { data, error } = await supabase
       .from('time_entries')
       .insert({
-        firm_id:     userRow.firm_id,
-        client_id:   resolvedClientId,
+        firm_id:    userRow.firm_id,
+        client_id:  resolvedClientId,
         workflow_id,
-        task_id:     task_id ?? null,
-        user_id:     user.id,
-        started_at:  new Date().toISOString(),
-        note:        note ?? null,
+        task_id:    task_id ?? null,
+        user_id:    user.id,
+        started_at: new Date().toISOString(),
+        is_running: true,
+        note:       note ?? null,
         billable,
       })
       .select()
@@ -99,7 +116,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ data, action: 'started' }, { status: 201 })
   }
 
-  // ── STOP timer ──────────────────────────────────────────────────────────────
+  // ── STOP ─────────────────────────────────────────────────────────────────────
   if (action === 'stop') {
     if (!entry_id) return NextResponse.json({ error: 'entry_id required' }, { status: 400 })
 
@@ -113,9 +130,13 @@ export async function POST(req: NextRequest) {
 
     const { data, error } = await supabase
       .from('time_entries')
-      .update({ stopped_at: stoppedAt.toISOString(), duration_minutes: durationMinutes })
+      .update({
+        stopped_at:       stoppedAt.toISOString(),
+        is_running:       false,
+        duration_minutes: durationMinutes,
+      })
       .eq('id', entry_id)
-      .eq('user_id', user.id) // can only stop your own timer
+      .eq('user_id', user.id)
       .select()
       .single()
 
@@ -123,7 +144,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ data, action: 'stopped', duration_minutes: durationMinutes })
   }
 
-  // ── LOG manual entry ─────────────────────────────────────────────────────────
+  // ── LOG manual ───────────────────────────────────────────────────────────────
   if (action === 'log') {
     if (!workflow_id || !duration_minutes) {
       return NextResponse.json({ error: 'workflow_id and duration_minutes required' }, { status: 400 })
@@ -131,8 +152,12 @@ export async function POST(req: NextRequest) {
 
     let resolvedClientId = client_id
     if (!resolvedClientId) {
-      const { data: wf } = await supabase.from('workflows').select('client_id').eq('id', workflow_id).single()
+      const { data: wf } = await supabase
+        .from('workflows').select('client_id').eq('id', workflow_id).single()
       resolvedClientId = wf?.client_id
+    }
+    if (!resolvedClientId) {
+      return NextResponse.json({ error: 'Could not resolve client_id' }, { status: 400 })
     }
 
     const { data, error } = await supabase
@@ -144,6 +169,7 @@ export async function POST(req: NextRequest) {
         task_id:          task_id ?? null,
         user_id:          user.id,
         duration_minutes: Number(duration_minutes),
+        is_running:       false,
         note:             note ?? null,
         billable,
       })

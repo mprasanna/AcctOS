@@ -2406,10 +2406,10 @@ function BillingRatesSection() {
   }
 
   return (
-    <Card style={{ padding:"20px 24px", marginTop:14 }}>
+    <Card style={{ padding:"20px 24px" }}>
       <div style={{ fontSize:14, fontWeight:600, color:C.text, marginBottom:4 }}>Per-Filing Billing Rates</div>
       <div style={{ fontSize:12, color:C.muted, marginBottom:14 }}>
-        Set a default rate per filing type in CAD. Used when "Auto-invoice on completion" is enabled.
+        Default rate per filing type in CAD. Used both when sending invoices manually from a client's workflow and when auto-invoice on completion is enabled. You can override the amount per-invoice when sending.
       </div>
       <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
         {WORKFLOW_TYPES.map(type => (
@@ -3610,35 +3610,183 @@ function SettingsPage() {
       {activeTab==="portal" && <PortalSettingsTab />}
 
       {/* ── BILLING ── */}
-      {activeTab==="billing" && (
-        <>
-        <Card style={{ padding:"20px 24px" }}>
-          <div style={{ fontSize:14, fontWeight:600, color:C.text, marginBottom:16 }}>Billing Plan</div>
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:12, marginBottom:16 }}>
-            {[
-              ["Starter","$49/mo","Up to 50 clients","2 users"],
-              ["Growth","$149/mo","Up to 150 clients","5 users"],
-              ["Scale","$299/mo","Unlimited clients","Unlimited users"],
-            ].map(([name,price,clients,users]) => (
-              <div key={name} style={{ border:`2px solid ${C.border}`, borderRadius:10, padding:"16px" }}>
+      {activeTab==="billing" && <BillingTab />}
+    </div>
+  );
+}
+
+// ─── BILLING TAB ─────────────────────────────────────────────────────────────
+function BillingTab() {
+  // ── Subscription plan state ───────────────────────────────────────────────
+  const [planLoading, setPlanLoading]   = useState({});
+  const [planError, setPlanError]       = useState(null);
+  const [currentPlan, setCurrentPlan]   = useState(null);
+
+  // ── Stripe Connect state ──────────────────────────────────────────────────
+  const [stripeStatus, setStripeStatus]   = useState(null); // null | "connected" | "not_connected"
+  const [stripeLoading, setStripeLoading] = useState(true);
+  const [stripeConnecting, setStripeConnecting] = useState(false);
+  const [stripeError, setStripeError]     = useState(null);
+
+  useEffect(() => {
+    // Load current plan
+    fetch("/api/billing", { credentials:"include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.plan) setCurrentPlan(d.plan); })
+      .catch(()=>{});
+
+    // Load Stripe Connect status
+    fetch("/api/stripe/connect/status", { credentials:"include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { setStripeStatus(d?.connected ? "connected" : "not_connected"); })
+      .catch(()=>{ setStripeStatus("not_connected"); })
+      .finally(() => setStripeLoading(false));
+  }, []);
+
+  async function handlePlan(name) {
+    setPlanLoading(prev => ({...prev, [name]:true}));
+    setPlanError(null);
+    try {
+      const res  = await fetch("/api/billing/checkout", {
+        method:"POST", credentials:"include",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ plan: name.toLowerCase() }),
+      });
+      const data = await res.json();
+      if (res.ok && data.url) {
+        window.location.href = data.url;
+      } else {
+        setPlanError(data.error || "Could not open billing — please try again.");
+      }
+    } catch(e) {
+      setPlanError("Network error — check your connection and try again.");
+    } finally {
+      setPlanLoading(prev => ({...prev, [name]:false}));
+    }
+  }
+
+  async function handleStripeConnect() {
+    setStripeConnecting(true); setStripeError(null);
+    try {
+      const res  = await fetch("/api/stripe/connect/onboard", {
+        method:"POST", credentials:"include",
+      });
+      const data = await res.json();
+      if (res.ok && data.url) {
+        window.location.href = data.url;
+      } else {
+        setStripeError(data.error || "Could not start Stripe onboarding.");
+      }
+    } catch(e) {
+      setStripeError("Network error — please try again.");
+    } finally {
+      setStripeConnecting(false);
+    }
+  }
+
+  const PLANS = [
+    { name:"Starter", price:"$49",  period:"mo", clients:"Up to 50 clients",   users:"2 users",          highlight:false },
+    { name:"Growth",  price:"$149", period:"mo", clients:"Up to 150 clients",  users:"5 users",          highlight:true  },
+    { name:"Scale",   price:"$299", period:"mo", clients:"Unlimited clients",  users:"Unlimited users",  highlight:false },
+  ];
+
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+
+      {/* ── AcctOS subscription ── */}
+      <Card style={{ padding:"20px 24px" }}>
+        <div style={{ fontSize:14, fontWeight:600, color:C.text, marginBottom:4 }}>AcctOS Plan</div>
+        <div style={{ fontSize:12, color:C.muted, marginBottom:16 }}>
+          Your firm's subscription. Flat CAD pricing — no per-user fees.
+          {currentPlan && <span style={{ marginLeft:8, background:C.primaryBg, color:C.primary, fontSize:11, fontWeight:600, padding:"1px 8px", borderRadius:10 }}>Current: {currentPlan}</span>}
+        </div>
+
+        {planError && (
+          <div style={{ background:C.redBg, border:`1px solid #FCA5A5`, borderRadius:8, padding:"8px 12px", fontSize:12, color:C.red, marginBottom:14 }}>
+            {planError}
+          </div>
+        )}
+
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:12, marginBottom:14 }}>
+          {PLANS.map(({ name, price, period, clients, users, highlight }) => {
+            const isCurrent = currentPlan?.toLowerCase() === name.toLowerCase();
+            const isLoading = planLoading[name];
+            return (
+              <div key={name} style={{ border:`2px solid ${highlight ? C.primary : C.border}`, borderRadius:10, padding:"16px", background:highlight ? C.primaryBg : "white", position:"relative" }}>
+                {highlight && <div style={{ position:"absolute", top:-10, left:"50%", transform:"translateX(-50%)", background:C.primary, color:"white", fontSize:10, fontWeight:700, padding:"2px 10px", borderRadius:10 }}>Most popular</div>}
+                {isCurrent && <div style={{ position:"absolute", top:-10, right:12, background:C.green, color:"white", fontSize:10, fontWeight:700, padding:"2px 10px", borderRadius:10 }}>✓ Active</div>}
                 <div style={{ fontSize:14, fontWeight:700, color:C.text }}>{name}</div>
-                <div style={{ fontSize:24, fontWeight:700, color:C.text, margin:"6px 0" }}>{price}</div>
+                <div style={{ display:"flex", alignItems:"baseline", gap:2, margin:"6px 0" }}>
+                  <span style={{ fontSize:24, fontWeight:700, color:C.text }}>{price}</span>
+                  <span style={{ fontSize:12, color:C.muted }}>CAD/{period}</span>
+                </div>
                 <div style={{ fontSize:12, color:C.muted }}>{clients}</div>
-                <div style={{ fontSize:12, color:C.muted, marginBottom:12 }}>{users}</div>
-                <button onClick={() => fetch("/api/billing/checkout", { method:"POST", credentials:"include", headers:{"Content-Type":"application/json"}, body:JSON.stringify({plan:name.toLowerCase()}) }).then(r=>r.json()).then(d=>{ if(d.url) window.location.href=d.url; })}
-                  style={{ background:C.primary, color:"white", border:"none", borderRadius:8, padding:"7px 14px", fontSize:12, fontWeight:600, cursor:"pointer", width:"100%" }}>
-                  Manage Plan →
+                <div style={{ fontSize:12, color:C.muted, marginBottom:14 }}>{users}</div>
+                <button
+                  onClick={() => handlePlan(name)}
+                  disabled={isLoading || isCurrent}
+                  style={{ background: isCurrent ? C.greenBg : C.primary, color: isCurrent ? C.green : "white", border:"none", borderRadius:8, padding:"7px 14px", fontSize:12, fontWeight:600, cursor: isCurrent||isLoading ? "not-allowed" : "pointer", width:"100%", opacity: isLoading ? 0.7 : 1 }}>
+                  {isLoading ? "Opening…" : isCurrent ? "✓ Current plan" : "Select plan →"}
                 </button>
               </div>
-            ))}
-          </div>
-          <div style={{ fontSize:11, color:C.muted }}>Billing is managed via Stripe. Click "Manage Plan" to update your subscription, view invoices, or cancel.</div>
-        </Card>
+            );
+          })}
+        </div>
+        <div style={{ fontSize:11, color:C.muted }}>
+          Billing managed via Stripe. One avoided CRA penalty covers ~1 month of the Growth plan.
+        </div>
+      </Card>
 
-        {/* Per-job billing rates */}
-        <BillingRatesSection />
-        </>
-      )}
+      {/* ── Stripe Connect — for client invoicing ── */}
+      <Card style={{ padding:"20px 24px" }}>
+        <div style={{ fontSize:14, fontWeight:600, color:C.text, marginBottom:4 }}>Stripe Connect — Client Invoicing</div>
+        <div style={{ fontSize:12, color:C.muted, marginBottom:14 }}>
+          Connect a Stripe account to send invoices to your clients from within AcctOS. This is separate from your AcctOS subscription — it's the account your clients pay into.
+        </div>
+
+        {stripeError && (
+          <div style={{ background:C.redBg, border:`1px solid #FCA5A5`, borderRadius:8, padding:"8px 12px", fontSize:12, color:C.red, marginBottom:12 }}>
+            {stripeError}
+          </div>
+        )}
+
+        {stripeLoading ? (
+          <div style={{ fontSize:13, color:C.muted }}>Checking Stripe status…</div>
+        ) : stripeStatus === "connected" ? (
+          <div style={{ background:C.greenBg, border:"1px solid #BBF7D0", borderRadius:9, padding:"14px 16px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+            <div>
+              <div style={{ fontSize:13, fontWeight:600, color:C.green }}>✓ Stripe Connected — Client Invoicing Active</div>
+              <div style={{ fontSize:12, color:"#166534", marginTop:2 }}>Invoices sent from the Invoices tab will charge your clients via Stripe.</div>
+            </div>
+            <button
+              onClick={() => fetch("/api/billing/portal",{method:"POST",credentials:"include"}).then(r=>r.json()).then(d=>{if(d.url)window.location.href=d.url;})}
+              style={{ background:"none", border:`1px solid ${C.green}`, borderRadius:8, padding:"6px 14px", fontSize:12, fontWeight:600, color:C.green, cursor:"pointer", flexShrink:0 }}>
+              Stripe Dashboard →
+            </button>
+          </div>
+        ) : (
+          <div style={{ background:C.amberBg, border:"1px solid #FCD34D", borderRadius:9, padding:"14px 16px" }}>
+            <div style={{ fontSize:13, fontWeight:600, color:"#92400E", marginBottom:4 }}>⚠ Stripe not connected</div>
+            <div style={{ fontSize:12, color:"#78350F", marginBottom:12 }}>
+              Without a connected Stripe account, the Invoices tab in each client workflow will show an error. Takes about 5 minutes to set up.
+            </div>
+            <button
+              onClick={handleStripeConnect}
+              disabled={stripeConnecting}
+              style={{ background:"#F59E0B", color:"white", border:"none", borderRadius:8, padding:"8px 18px", fontSize:13, fontWeight:600, cursor:stripeConnecting?"not-allowed":"pointer", opacity:stripeConnecting?0.7:1 }}>
+              {stripeConnecting ? "Opening Stripe…" : "Connect Stripe account →"}
+            </button>
+          </div>
+        )}
+
+        <div style={{ fontSize:11, color:C.muted, marginTop:12 }}>
+          Stripe takes a small processing fee per transaction (typically 2.9% + 30¢). AcctOS does not take any additional cut.
+        </div>
+      </Card>
+
+      {/* ── Per-filing billing rates ── */}
+      <BillingRatesSection />
+
     </div>
   );
 }
