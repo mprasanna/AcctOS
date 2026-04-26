@@ -1,5 +1,5 @@
 "use client";
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect } from "react";
 
 // ─── DESIGN TOKENS ────────────────────────────────────────────────────────────
 const C = {
@@ -1680,7 +1680,10 @@ function ActivityTab({ clientId }) {
 function InvoicesTab({ wf, client }) {
   const [invoices, setInvoices]   = useState([]);
   const [loading, setLoading]     = useState(true);
-
+  const [creating, setCreating]   = useState(false);
+  const [override, setOverride]   = useState("");
+  const [error, setError]         = useState(null);
+  const [success, setSuccess]     = useState(null);
 
   useEffect(() => {
     if (!wf?.id) return;
@@ -1690,7 +1693,32 @@ function InvoicesTab({ wf, client }) {
       .finally(() => setLoading(false));
   }, [wf?.id]);
 
-
+  async function createInvoice() {
+    setCreating(true); setError(null); setSuccess(null);
+    try {
+      const body = { workflow_id: wf.id };
+      if (override) body.override_amount = Math.round(parseFloat(override) * 100);
+      const res  = await fetch("/api/invoices", {
+        method:"POST", credentials:"include",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSuccess(`Invoice created — $${((data.amount_cents||0)/100).toFixed(2)} CAD sent via Stripe.`);
+        setInvoices(prev => [{
+          id: data.invoiceId,
+          event_type: "filing_invoice_created",
+          amount_cents: data.amount_cents,
+          description: data.description,
+          created_at: new Date().toISOString(),
+        }, ...prev]);
+        setOverride("");
+      } else {
+        setError(data.error || "Failed to create invoice.");
+      }
+    } finally { setCreating(false); }
+  }
 
   const fmtCAD = cents => `$${((cents||0)/100).toFixed(2)} CAD`;
 
@@ -1698,26 +1726,22 @@ function InvoicesTab({ wf, client }) {
     <div>
       <div style={{ fontSize:13, fontWeight:600, color:C.text, marginBottom:14 }}>Invoices — {wf?.label}</div>
 
-      {/* Stripe setup pending notice */}
-      <Card style={{ padding:"20px 22px", marginBottom:14, background:"#FFFBEB", border:`1px solid #FCD34D` }}>
-        <div style={{ display:"flex", gap:14, alignItems:"flex-start" }}>
-          <div style={{ fontSize:24, flexShrink:0 }}>🔗</div>
-          <div style={{ flex:1 }}>
-            <div style={{ fontSize:13, fontWeight:600, color:"#92400E", marginBottom:4 }}>Stripe integration not yet connected</div>
-            <div style={{ fontSize:12, color:"#78350F", lineHeight:1.6, marginBottom:14 }}>
-              Per-job invoicing requires a Stripe account to be connected. Once connected, you can send invoices directly from any workflow using your billing rates, or enter a custom amount.
-            </div>
-            <button
-              onClick={() => {
-                // Navigate to Settings → Billing tab
-                if (typeof window !== "undefined") {
-                  window.dispatchEvent(new CustomEvent("acct-nav", { detail: { view:"settings", tab:"billing" } }));
-                }
-              }}
-              style={{ background:C.primary, color:"white", border:"none", borderRadius:7, padding:"7px 16px", fontSize:13, fontWeight:600, cursor:"pointer" }}>
-              Set up Stripe in Settings → Billing →
-            </button>
-          </div>
+      {/* Create invoice */}
+      <Card style={{ padding:"16px 18px", marginBottom:14 }}>
+        <div style={{ fontSize:13, fontWeight:500, color:C.text, marginBottom:8 }}>Create invoice for this workflow</div>
+        {error && <div style={{ background:C.redBg, border:"1px solid #FCA5A5", borderRadius:7, padding:"8px 12px", fontSize:12, color:C.red, marginBottom:10 }}>{error}</div>}
+        {success && <div style={{ background:C.greenBg, border:"1px solid #BBF7D0", borderRadius:7, padding:"8px 12px", fontSize:12, color:C.green, marginBottom:10 }}>✓ {success}</div>}
+        <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+          <input type="number" min="0" step="0.01" placeholder="Amount (CAD) — leave blank to use rate from Settings"
+            value={override} onChange={e => setOverride(e.target.value)}
+            style={{ flex:1, padding:"7px 10px", borderRadius:7, border:`1px solid ${C.border}`, fontSize:13 }} />
+          <button onClick={createInvoice} disabled={creating}
+            style={{ background:C.primary, color:"white", border:"none", borderRadius:7, padding:"7px 16px", fontSize:13, fontWeight:600, cursor:"pointer", opacity:creating?0.7:1, whiteSpace:"nowrap" }}>
+            {creating ? "Sending…" : "Send Invoice →"}
+          </button>
+        </div>
+        <div style={{ fontSize:11, color:C.muted, marginTop:6 }}>
+          Default rates are set in Settings → Billing → Billing Rates. Invoice is sent via Stripe to the client email on file.
         </div>
       </Card>
 
@@ -1749,45 +1773,80 @@ function InvoicesTab({ wf, client }) {
 }
 
 // ─── INTEGRATION TAB (wired to DB) ───────────────────────────────────────────
-function IntegrationTab({ clientId }) {
-  const [integrations, setIntegrations] = useState([]);
-  const [loading, setLoading]           = useState(true);
-  const [portalLink, setPortalLink]     = useState(null);
-  const [generatingLink, setGeneratingLink] = useState(false);
+function IntegrationTab({ clientId, client }) {
+  const [integrations, setIntegrations]   = useState([]);
+  const [loading, setLoading]             = useState(true);
+
+  // ── New portal invite system ──────────────────────────────────────────────
+  const [portalStatus, setPortalStatus]   = useState(null);  // { portal_user, pending_invite }
+  const [inviteEmail, setInviteEmail]     = useState("");
+  const [sendingInvite, setSendingInvite] = useState(false);
+  const [inviteMsg, setInviteMsg]         = useState(null);
+  const [revoking, setRevoking]           = useState(false);
 
   useEffect(() => {
-    fetch("/api/integrations", { credentials:"include" })
-      .then(r => r.ok ? r.json() : null)
-      .then(json => { if (json?.data) setIntegrations(json.data); })
-      .catch(()=>{})
-      .finally(() => setLoading(false));
-  }, []);
+    Promise.all([
+      fetch("/api/integrations", { credentials:"include" }).then(r => r.ok ? r.json() : null),
+      fetch(`/api/clients/${clientId}/portal`, { credentials:"include" }).then(r => r.ok ? r.json() : null),
+    ]).then(([intData, portalData]) => {
+      if (intData?.data) setIntegrations(intData.data);
+      if (portalData)    setPortalStatus(portalData);
+    }).catch(()=>{}).finally(() => setLoading(false));
+    if (client?.client_email) setInviteEmail(client.client_email);
+  }, [clientId]);
 
-  async function generatePortalLink() {
-    setGeneratingLink(true);
+  async function sendInvite() {
+    if (!inviteEmail.trim()) return;
+    setSendingInvite(true); setInviteMsg(null);
     try {
-      const res  = await fetch("/api/portal/tokens", {
+      const res = await fetch(`/api/clients/${clientId}/portal/invite`, {
         method:"POST", credentials:"include",
         headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({ client_id: clientId }),
+        body: JSON.stringify({ email: inviteEmail.trim() }),
       });
       const data = await res.json();
-      if (res.ok) setPortalLink(data.portal_url || data.url || JSON.stringify(data));
-    } catch(e) {}
-    finally { setGeneratingLink(false); }
+      if (res.ok) {
+        setPortalStatus(prev => ({...prev, pending_invite: data.invite}));
+        setInviteMsg({ ok:true, text:`Invite sent to ${inviteEmail}` });
+      } else {
+        setInviteMsg({ ok:false, text: data.error || "Failed to send invite." });
+      }
+    } catch(e) { setInviteMsg({ ok:false, text:"Network error." }); }
+    finally { setSendingInvite(false); }
+  }
+
+  async function resendInvite() {
+    setSendingInvite(true); setInviteMsg(null);
+    try {
+      const res = await fetch(`/api/clients/${clientId}/portal/invite`, {
+        method:"POST", credentials:"include",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ email: portalStatus?.pending_invite?.email || inviteEmail.trim() }),
+      });
+      const data = await res.json();
+      setInviteMsg(res.ok ? { ok:true, text:"Invite resent." } : { ok:false, text:data.error||"Failed." });
+    } catch(e) { setInviteMsg({ ok:false, text:"Network error." }); }
+    finally { setSendingInvite(false); }
+  }
+
+  async function revokeAccess() {
+    if (!window.confirm("Remove portal access for this client?")) return;
+    setRevoking(true);
+    try {
+      const res = await fetch(`/api/clients/${clientId}/portal/user`, { method:"DELETE", credentials:"include" });
+      if (res.ok) setPortalStatus({ portal_user: null, pending_invite: null });
+    } catch(e) {} finally { setRevoking(false); }
   }
 
   const statusCfg = {
-    connected:       { label:"Connected",       bg:C.greenBg,   color:C.green },
-    disconnected:    { label:"Not Connected",   bg:"#F1F5F9",   color:C.muted },
-    token_expired:   { label:"Token Expired",   bg:C.redBg,     color:C.red },
-    token_expiring:  { label:"Expiring Soon",   bg:C.amberBg,   color:C.amber },
-    error:           { label:"Error",           bg:C.redBg,     color:C.red },
+    connected:    { label:"Connected",    bg:C.greenBg, color:C.green },
+    disconnected: { label:"Not Connected", bg:"#F1F5F9", color:C.muted },
+    error:        { label:"Error",        bg:C.redBg,   color:C.red },
   };
 
   const PROVIDERS = [
-    { key:"qbo",  name:"QuickBooks Online",  desc:"Auto-sync bookkeeping → Stage 1 gate hands-free when reconciliation complete", authUrl:"/api/integrations/qbo" },
-    { key:"zoho", name:"Zoho Books",         desc:"Alternative accounting integration — same Stage 1 auto-advance", authUrl:"/api/integrations/zoho" },
+    { key:"qbo",  name:"QuickBooks Online", desc:"Auto-sync bookkeeping → Stage 1 gate advances hands-free when reconciliation complete", authUrl:"/api/integrations/qbo" },
+    { key:"zoho", name:"Zoho Books",        desc:"Alternative accounting integration — same Stage 1 auto-advance", authUrl:"/api/integrations/zoho" },
   ];
 
   return (
@@ -1797,7 +1856,7 @@ function IntegrationTab({ clientId }) {
       {/* Accounting integrations */}
       {PROVIDERS.map(p => {
         const found = integrations.find(i => i.provider === p.key);
-        const sc    = statusCfg[found?.token_status || found?.status || "disconnected"];
+        const sc    = statusCfg[found?.status || "disconnected"];
         const isConnected = found?.status === "connected";
         return (
           <Card key={p.key} style={{ padding:"16px 20px", marginBottom:10 }}>
@@ -1805,65 +1864,106 @@ function IntegrationTab({ clientId }) {
               <div>
                 <div style={{ fontSize:14, fontWeight:600, color:C.text }}>{p.name}</div>
                 <div style={{ fontSize:12, color:C.muted, marginTop:2 }}>{p.desc}</div>
-                {isConnected && found?.company_name && (
-                  <div style={{ fontSize:11, color:C.green, marginTop:3 }}>✓ Connected to: {found.company_name}</div>
-                )}
-                {isConnected && found?.last_synced_at && (
-                  <div style={{ fontSize:11, color:C.muted }}>Last sync: {new Date(found.last_synced_at).toLocaleString("en-CA",{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"})}</div>
-                )}
-                {found?.last_sync_error && (
-                  <div style={{ fontSize:11, color:C.red, marginTop:3 }}>⚠ {found.last_sync_error}</div>
-                )}
+                {isConnected && found?.company_name && <div style={{ fontSize:11, color:C.green, marginTop:3 }}>✓ Connected to: {found.company_name}</div>}
+                {isConnected && found?.last_synced_at && <div style={{ fontSize:11, color:C.muted }}>Last sync: {new Date(found.last_synced_at).toLocaleString("en-CA",{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"})}</div>}
               </div>
               <Pill label={loading?"Loading…":sc.label} bg={sc.bg} color={sc.color} />
             </div>
-            {!isConnected ? (
-              <button onClick={() => window.location.href = p.authUrl}
-                style={{ background:C.primary, color:"white", border:"none", borderRadius:8, padding:"7px 14px", fontSize:13, fontWeight:600, cursor:"pointer" }}>
-                Connect {p.name} →
-              </button>
-            ) : (
-              <button onClick={() => fetch(`/api/integrations/${found.id}`, { method:"DELETE", credentials:"include" }).then(() => setIntegrations(prev => prev.filter(i => i.id !== found.id)))}
-                style={{ background:"none", border:`1px solid ${C.border}`, borderRadius:8, padding:"6px 14px", fontSize:12, color:C.muted, cursor:"pointer" }}>
-                Disconnect
-              </button>
-            )}
+            {!isConnected
+              ? <button onClick={() => window.location.href = p.authUrl}
+                  style={{ background:C.primary, color:"white", border:"none", borderRadius:8, padding:"7px 14px", fontSize:13, fontWeight:600, cursor:"pointer" }}>
+                  Connect {p.name} →
+                </button>
+              : <button onClick={() => setIntegrations(prev => prev.filter(i => i.id !== found.id))}
+                  style={{ background:"none", border:`1px solid ${C.border}`, borderRadius:8, padding:"6px 14px", fontSize:12, color:C.muted, cursor:"pointer" }}>
+                  Disconnect
+                </button>
+            }
           </Card>
         );
       })}
 
-      {/* Client portal link */}
-      <Card style={{ padding:"16px 20px" }}>
+      {/* ── Client Portal ── */}
+      <Card style={{ padding:"20px 24px" }}>
         <div style={{ fontSize:14, fontWeight:600, color:C.text, marginBottom:4 }}>Client Portal</div>
-        <div style={{ fontSize:12, color:C.muted, marginBottom:12 }}>
-          Generate a secure link for this client to upload documents directly — no login required. Link expires in 7 days.
+        <div style={{ fontSize:12, color:C.muted, marginBottom:16 }}>
+          Business owners log in to their portal to upload documents, view filing status, send messages, and pay invoices. Each client gets their own account with a permanent login.
         </div>
-        {portalLink ? (
+
+        {inviteMsg && (
+          <div style={{ background:inviteMsg.ok?C.greenBg:C.redBg, border:`1px solid ${inviteMsg.ok?"#BBF7D0":"#FCA5A5"}`, borderRadius:8, padding:"8px 12px", fontSize:12, color:inviteMsg.ok?"#14532D":C.red, marginBottom:12 }}>
+            {inviteMsg.text}
+          </div>
+        )}
+
+        {/* State 1: Portal account active */}
+        {portalStatus?.portal_user && (
           <div>
-            <div style={{ background:C.greenBg, border:"1px solid #BBF7D0", borderRadius:8, padding:"8px 12px", marginBottom:8, fontSize:12, color:"#14532D", wordBreak:"break-all" }}>
-              ✓ {portalLink}
+            <div style={{ background:C.greenBg, border:"1px solid #BBF7D0", borderRadius:9, padding:"12px 16px", marginBottom:12 }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                <div>
+                  <div style={{ fontSize:13, fontWeight:600, color:"#14532D", marginBottom:2 }}>✓ Portal account active</div>
+                  <div style={{ fontSize:12, color:"#166534" }}>{portalStatus.portal_user.email}</div>
+                  {portalStatus.portal_user.last_login_at && (
+                    <div style={{ fontSize:11, color:C.muted, marginTop:2 }}>
+                      Last login: {new Date(portalStatus.portal_user.last_login_at).toLocaleDateString("en-CA",{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"})}
+                    </div>
+                  )}
+                </div>
+                <button onClick={revokeAccess} disabled={revoking}
+                  style={{ background:"none", border:`1px solid ${C.red}`, borderRadius:7, padding:"5px 12px", fontSize:11, color:C.red, cursor:"pointer", opacity:revoking?0.5:1 }}>
+                  {revoking ? "Revoking…" : "Revoke access"}
+                </button>
+              </div>
             </div>
-            <div style={{ display:"flex", gap:8 }}>
-              <button onClick={() => navigator.clipboard.writeText(portalLink)}
-                style={{ background:C.primaryBg, color:C.primary, border:`1px solid #BFDBFE`, borderRadius:8, padding:"6px 14px", fontSize:12, fontWeight:600, cursor:"pointer" }}>
-                Copy Link
-              </button>
-              <button onClick={() => setPortalLink(null)}
-                style={{ background:"none", border:`1px solid ${C.border}`, borderRadius:8, padding:"6px 14px", fontSize:12, color:C.muted, cursor:"pointer" }}>
-                Generate New
-              </button>
+            <div style={{ fontSize:11, color:C.muted }}>
+              Portal URL: <span style={{ color:C.primary }}>app.acct-os.com/portal/login</span>
             </div>
           </div>
-        ) : (
-          <button onClick={generatePortalLink} disabled={generatingLink}
-            style={{ background:C.primary, color:"white", border:"none", borderRadius:8, padding:"7px 14px", fontSize:13, fontWeight:600, cursor:generatingLink?"not-allowed":"pointer", opacity:generatingLink?0.7:1 }}>
-            {generatingLink ? "Generating…" : "Generate Portal Link →"}
-          </button>
+        )}
+
+        {/* State 2: Invite pending */}
+        {!portalStatus?.portal_user && portalStatus?.pending_invite && (
+          <div>
+            <div style={{ background:C.amberBg, border:"1px solid #FCD34D", borderRadius:9, padding:"12px 16px", marginBottom:12 }}>
+              <div style={{ fontSize:13, fontWeight:600, color:"#92400E", marginBottom:2 }}>⏳ Invite pending</div>
+              <div style={{ fontSize:12, color:"#78350F" }}>Sent to: {portalStatus.pending_invite.email}</div>
+              <div style={{ fontSize:11, color:C.muted, marginTop:2 }}>
+                Expires: {new Date(portalStatus.pending_invite.expires_at).toLocaleDateString("en-CA",{month:"short",day:"numeric"})}
+              </div>
+            </div>
+            <button onClick={resendInvite} disabled={sendingInvite}
+              style={{ background:"none", border:`1px solid ${C.border}`, borderRadius:8, padding:"6px 14px", fontSize:12, color:C.muted, cursor:"pointer" }}>
+              {sendingInvite ? "Sending…" : "Resend invite"}
+            </button>
+          </div>
+        )}
+
+        {/* State 3: No portal account — send invite */}
+        {!portalStatus?.portal_user && !portalStatus?.pending_invite && (
+          <div>
+            <div style={{ fontSize:12, color:C.muted, marginBottom:10 }}>
+              Send an invite email so the client can set up their portal account. They receive a setup link — no manual password reset needed.
+            </div>
+            <div style={{ display:"flex", gap:8 }}>
+              <input value={inviteEmail} onChange={e => setInviteEmail(e.target.value)}
+                placeholder="client@company.ca"
+                style={{ flex:1, padding:"8px 12px", borderRadius:8, border:`1px solid ${C.border}`, fontSize:13, outline:"none" }} />
+              <button onClick={sendInvite} disabled={sendingInvite || !inviteEmail.trim()}
+                style={{ background:C.primary, color:"white", border:"none", borderRadius:8, padding:"8px 18px", fontSize:13, fontWeight:600, cursor:inviteEmail.trim()&&!sendingInvite?"pointer":"not-allowed", opacity:sendingInvite?0.7:1, whiteSpace:"nowrap" }}>
+                {sendingInvite ? "Sending…" : "Send portal invite →"}
+              </button>
+            </div>
+            <div style={{ fontSize:11, color:C.muted, marginTop:6 }}>
+              An email is sent via Resend with the firm logo + tagline. The client clicks to set a password and gets immediate portal access.
+            </div>
+          </div>
         )}
       </Card>
     </div>
   );
 }
+
 
 // ─── EDIT CLIENT MODAL ────────────────────────────────────────────────────────
 function EditClientModal({ client, onClose, onSaved }) {
@@ -2154,7 +2254,7 @@ function ClientWorkspace({ client: initialClient, initialTab, onBack, onRefresh 
 
       {/* INTEGRATION TAB */}
       {tab==="integration" && (
-        <IntegrationTab clientId={client.id} />
+        <IntegrationTab clientId={client.id} client={client} />
       )}
     </div>
     {showEdit && (
