@@ -11,7 +11,7 @@ const resend = new Resend(process.env.RESEND_API_KEY)
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { client_id: string } }
+  { params }: { params: { id: string } }
 ) {
   const { supabase, firmUser, error } = await getFirmUser(req)
   if (error) return err(error, 401)
@@ -25,7 +25,7 @@ export async function POST(
   const { email } = body
   if (!email?.trim()) return err('email is required')
 
-  const { client_id } = params
+  const { id: client_id } = params
 
   // Verify client belongs to this firm
   const { data: client } = await supabase

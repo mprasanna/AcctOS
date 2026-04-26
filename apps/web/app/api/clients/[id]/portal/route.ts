@@ -8,7 +8,7 @@ import { getFirmUser, err, ok } from '@/lib/portal-auth'
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { client_id: string } }
+  { params }: { params: { id: string } }
 ) {
   const { supabase, firmUser, error } = await getFirmUser(req)
   if (error) return err(error, 401)
