@@ -3066,7 +3066,7 @@ function MessagesTab({ client }) {
 }
 
 function PortalSettingsTab() {
-  const [portal, setPortal] = useState({ tagline:"Your secure accounting portal", esign_provider:"none", esign_key:"", esign_secret:"" });
+  const [portal, setPortal] = useState({ tagline:"Your secure accounting portal" });
   const [logoUrl, setLogoUrl]         = useState(null);
   const [logoFile, setLogoFile]       = useState(null);
   const [logoPreview, setLogoPreview] = useState(null);
@@ -3171,41 +3171,6 @@ function PortalSettingsTab() {
         </div>
       </Card>
 
-      <Card style={{ padding:"20px 24px" }}>
-        <div style={{ fontSize:14, fontWeight:600, color:C.text, marginBottom:4 }}>E-signature provider</div>
-        <div style={{ fontSize:12, color:C.muted, marginBottom:16 }}>Used for T183 authorization on T1 workflows. Clients receive a signing request instead of uploading a scanned form.</div>
-        <div style={{ display:"flex", flexDirection:"column", gap:10, marginBottom:16 }}>
-          {[["none","No e-signatures","Clients scan and upload the T183 form. Current default."],["docusign","DocuSign","Industry-standard. Clients recognize the brand. Recommended."],["dropboxsign","Dropbox Sign","Developer-friendly. Simpler API. Lower cost at low volume."]].map(([val, label, desc]) => (
-            <div key={val} onClick={() => setPortal(p=>({...p,esign_provider:val}))}
-              style={{ display:"flex", gap:12, alignItems:"flex-start", padding:"12px 14px", borderRadius:9, border:`1.5px solid ${portal.esign_provider===val?C.primary:C.border}`, background:portal.esign_provider===val?C.primaryBg:"white", cursor:"pointer" }}>
-              <div style={{ width:16, height:16, borderRadius:"50%", border:`2px solid ${portal.esign_provider===val?C.primary:C.border}`, background:portal.esign_provider===val?C.primary:"white", flexShrink:0, marginTop:1, display:"flex", alignItems:"center", justifyContent:"center" }}>
-                {portal.esign_provider===val && <div style={{ width:6, height:6, borderRadius:"50%", background:"white" }} />}
-              </div>
-              <div><div style={{ fontSize:13, fontWeight:600, color:C.text }}>{label}</div><div style={{ fontSize:12, color:C.muted }}>{desc}</div></div>
-            </div>
-          ))}
-        </div>
-        {portal.esign_provider !== "none" && (
-          <div style={{ display:"flex", flexDirection:"column", gap:10, padding:"14px", background:"#F8FAFC", borderRadius:9, border:`1px solid ${C.border}` }}>
-            <div style={{ fontSize:12, fontWeight:600, color:C.text }}>{portal.esign_provider === "docusign" ? "DocuSign" : "Dropbox Sign"} API credentials</div>
-            <div>
-              <label style={{ display:"block", fontSize:11, fontWeight:600, color:C.muted, marginBottom:4, textTransform:"uppercase", letterSpacing:"0.05em" }}>API Key</label>
-              <div style={{ display:"flex", gap:6 }}>
-                <input type={showKey?"text":"password"} value={portal.esign_key} onChange={e => setPortal(p=>({...p,esign_key:e.target.value}))} placeholder="Paste your API key"
-                  style={{ flex:1, padding:"7px 10px", borderRadius:7, border:`1px solid ${C.border}`, fontSize:13, outline:"none" }} />
-                <button onClick={() => setShowKey(v=>!v)} style={{ background:"none", border:`1px solid ${C.border}`, borderRadius:7, padding:"7px 10px", fontSize:11, color:C.muted, cursor:"pointer" }}>{showKey?"Hide":"Show"}</button>
-              </div>
-            </div>
-            <div>
-              <label style={{ display:"block", fontSize:11, fontWeight:600, color:C.muted, marginBottom:4, textTransform:"uppercase", letterSpacing:"0.05em" }}>{portal.esign_provider === "docusign" ? "Account ID / Secret" : "API Secret"}</label>
-              <input type="password" value={portal.esign_secret} onChange={e => setPortal(p=>({...p,esign_secret:e.target.value}))} placeholder="Paste your secret"
-                style={{ width:"100%", padding:"7px 10px", borderRadius:7, border:`1px solid ${C.border}`, fontSize:13, outline:"none", boxSizing:"border-box" }} />
-            </div>
-            <div style={{ fontSize:11, color:C.muted }}>{portal.esign_provider === "docusign" ? "Find these in your DocuSign Developer account under Apps & Keys." : "Find these in your Dropbox Sign dashboard under API → API Key."}</div>
-          </div>
-        )}
-      </Card>
-
       <div>
         <button onClick={save} disabled={saving}
           style={{ background:C.primary, color:"white", border:"none", borderRadius:8, padding:"9px 22px", fontSize:13, fontWeight:600, cursor:saving?"not-allowed":"pointer", opacity:saving?0.7:1 }}>
@@ -3227,6 +3192,8 @@ function SettingsPage() {
 
   // ── Automation rules state ───────────────────────────────────────────────────
   const [rules, setRules]       = useState({ auto_create_workflows:true, doc_reminder_day3:true, escalate_on_reminder2:true, deadline_alert_3d:true, overdue_flag:true, require_upload_to_receive:false, doc_reminder_send_to_client:false, invoice_on_completion:false });
+  const [esign, setEsign]       = useState({ provider:"none", key:"", secret:"" });
+  const [showEsignKey, setShowEsignKey] = useState(false);
   const [rulesSaving, setRulesSaving] = useState(false);
   const [rulesMsg, setRulesMsg] = useState(null);
 
@@ -3246,8 +3213,14 @@ function SettingsPage() {
     fetch("/api/settings", { credentials:"include" })
       .then(r => r.ok ? r.json() : null)
       .then(json => {
-        if (json?.firm) setFirm(f => ({...f, ...json.firm}));
-        if (json?.rules) setRules(r => ({...r, ...json.rules}));
+        if (json?.firm)   setFirm(f => ({...f, ...json.firm}));
+        if (json?.rules)  setRules(r => ({...r, ...json.rules}));
+        if (json?.portal) setEsign(e => ({
+          ...e,
+          provider: json.portal.esign_provider || "none",
+          key:      json.portal.esign_key || "",
+          secret:   json.portal.esign_secret || "",
+        }));
       }).catch(()=>{});
 
     // Load users
@@ -3286,6 +3259,23 @@ function SettingsPage() {
       setRulesMsg(res.ok ? { ok:true, text:"Saved." } : { ok:false, text:data.error || "Failed." });
     } catch(e) { setRulesMsg({ ok:false, text:"Network error." }); }
     finally { setRulesSaving(false); }
+  }
+
+  const [esignSaving, setEsignSaving] = useState(false);
+  const [esignMsg, setEsignMsg]       = useState(null);
+
+  async function saveEsign() {
+    setEsignSaving(true); setEsignMsg(null);
+    try {
+      const res = await fetch("/api/settings", {
+        method:"PATCH", credentials:"include",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ portal: { esign_provider: esign.provider, esign_key: esign.key, esign_secret: esign.secret } }),
+      });
+      const data = await res.json();
+      setEsignMsg(res.ok ? { ok:true, text:"E-signature settings saved." } : { ok:false, text:data.error || "Failed." });
+    } catch(e) { setEsignMsg({ ok:false, text:"Network error." }); }
+    finally { setEsignSaving(false); }
   }
 
   async function sendInvite() {
@@ -3457,37 +3447,87 @@ function SettingsPage() {
 
       {/* ── AUTOMATION ── */}
       {activeTab==="automation" && (
-        <Card style={{ padding:"20px 24px" }}>
-          <div style={{ fontSize:14, fontWeight:600, color:C.text, marginBottom:16 }}>Automation Rules</div>
-          {rulesMsg && <div style={{ background:rulesMsg.ok?C.greenBg:C.redBg, border:`1px solid ${rulesMsg.ok?"#BBF7D0":"#FCA5A5"}`, borderRadius:8, padding:"8px 12px", fontSize:12, color:rulesMsg.ok?"#14532D":C.red, marginBottom:14 }}>{rulesMsg.text}</div>}
-          <div style={{ display:"flex", flexDirection:"column", gap:14, marginBottom:20 }}>
-            {[
-              ["auto_create_workflows",  "Auto-create workflows at billing cycle start",        "On the 1st of each month, new GST workflows are created automatically for monthly filers."],
-              ["doc_reminder_day3",      "Send document reminder after 3 days",                 "If documents are still pending 3 days after a workflow reaches Stage 2, Reminder #1 is sent."],
-              ["escalate_on_reminder2",  "Escalate to owner on Reminder #2",                    "When Reminder #2 is sent, the firm owner is CC'd automatically."],
-              ["deadline_alert_3d",      "Deadline alert 3 days before CRA due date",           "Assigned accountant is notified 3 days before the CRA deadline if workflow is not Complete."],
-              ["overdue_flag",           "Flag overdue clients on dashboard",                   "Clients past their CRA deadline with an incomplete workflow are flagged Overdue."],
-              ["require_upload_to_receive","Require file upload before marking received",      "Accountants cannot click 'Mark Received' without uploading the file. Enforced server-side."],
-              ["doc_reminder_send_to_client","Send reminders directly to client",              "Reminder emails go to the client's email directly. Accountant is CC'd. Requires client_email on profile."],
-              ["invoice_on_completion",    "Auto-invoice when workflow completes",             "Creates and sends a Stripe invoice at Stage 6 close using the billing rate for that workflow type."],
-            ].map(([key, label, desc]) => (
-              <div key={key} style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:16 }}>
-                <div style={{ flex:1 }}>
-                  <div style={{ fontSize:13, fontWeight:500, color:C.text }}>{label}</div>
-                  <div style={{ fontSize:11, color:C.muted, marginTop:2 }}>{desc}</div>
+        <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+          <Card style={{ padding:"20px 24px" }}>
+            <div style={{ fontSize:14, fontWeight:600, color:C.text, marginBottom:16 }}>Automation Rules</div>
+            {rulesMsg && <div style={{ background:rulesMsg.ok?C.greenBg:C.redBg, border:`1px solid ${rulesMsg.ok?"#BBF7D0":"#FCA5A5"}`, borderRadius:8, padding:"8px 12px", fontSize:12, color:rulesMsg.ok?"#14532D":C.red, marginBottom:14 }}>{rulesMsg.text}</div>}
+            <div style={{ display:"flex", flexDirection:"column", gap:14, marginBottom:20 }}>
+              {[
+                ["auto_create_workflows",  "Auto-create workflows at billing cycle start",        "On the 1st of each month, new GST workflows are created automatically for monthly filers."],
+                ["doc_reminder_day3",      "Send document reminder after 3 days",                 "If documents are still pending 3 days after a workflow reaches Stage 2, Reminder #1 is sent."],
+                ["escalate_on_reminder2",  "Escalate to owner on Reminder #2",                    "When Reminder #2 is sent, the firm owner is CC'd automatically."],
+                ["deadline_alert_3d",      "Deadline alert 3 days before CRA due date",           "Assigned accountant is notified 3 days before the CRA deadline if workflow is not Complete."],
+                ["overdue_flag",           "Flag overdue clients on dashboard",                   "Clients past their CRA deadline with an incomplete workflow are flagged Overdue."],
+                ["require_upload_to_receive","Require file upload before marking received",      "Accountants cannot click 'Mark Received' without uploading the file. Enforced server-side."],
+                ["doc_reminder_send_to_client","Send reminders directly to client",              "Reminder emails go to the client's email directly. Accountant is CC'd. Requires client_email on profile."],
+                ["invoice_on_completion",    "Auto-invoice when workflow completes",             "Creates and sends a Stripe invoice at Stage 6 close using the billing rate for that workflow type."],
+              ].map(([key, label, desc]) => (
+                <div key={key} style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:16 }}>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontSize:13, fontWeight:500, color:C.text }}>{label}</div>
+                    <div style={{ fontSize:11, color:C.muted, marginTop:2 }}>{desc}</div>
+                  </div>
+                  <div onClick={() => setRules(r => ({...r,[key]:!r[key]}))}
+                    style={{ width:40, height:22, borderRadius:11, background:rules[key]?C.primary:C.border, cursor:"pointer", position:"relative", flexShrink:0, marginTop:2 }}>
+                    <div style={{ width:16, height:16, borderRadius:"50%", background:"white", position:"absolute", top:3, left:rules[key]?21:3, transition:"left 0.15s" }} />
+                  </div>
                 </div>
-                <div onClick={() => setRules(r => ({...r,[key]:!r[key]}))}
-                  style={{ width:40, height:22, borderRadius:11, background:rules[key]?C.primary:C.border, cursor:"pointer", position:"relative", flexShrink:0, marginTop:2 }}>
-                  <div style={{ width:16, height:16, borderRadius:"50%", background:"white", position:"absolute", top:3, left:rules[key]?21:3, transition:"left 0.15s" }} />
+              ))}
+            </div>
+            <button onClick={saveRules} disabled={rulesSaving}
+              style={{ background:C.primary, color:"white", border:"none", borderRadius:8, padding:"8px 18px", fontSize:13, fontWeight:600, cursor:rulesSaving?"not-allowed":"pointer", opacity:rulesSaving?0.7:1 }}>
+              {rulesSaving ? "Saving…" : "Save Automation Rules"}
+            </button>
+          </Card>
+
+          {/* ── E-SIGNATURE PROVIDER ── */}
+          <Card style={{ padding:"20px 24px" }}>
+            <div style={{ fontSize:14, fontWeight:600, color:C.text, marginBottom:4 }}>E-signature provider</div>
+            <div style={{ fontSize:12, color:C.muted, marginBottom:16 }}>Used for T183 authorization on T1 workflows. The firm connects one account — business owners sign via email link, no account needed.</div>
+            {esignMsg && <div style={{ background:esignMsg.ok?C.greenBg:C.redBg, border:`1px solid ${esignMsg.ok?"#BBF7D0":"#FCA5A5"}`, borderRadius:8, padding:"8px 12px", fontSize:12, color:esignMsg.ok?"#14532D":C.red, marginBottom:14 }}>{esignMsg.text}</div>}
+            <div style={{ display:"flex", flexDirection:"column", gap:10, marginBottom:16 }}>
+              {[
+                ["none",        "No e-signatures",  "Clients scan and upload the T183 form. Current default."],
+                ["docusign",    "DocuSign",          "Industry-standard. Clients recognize the brand. Recommended."],
+                ["dropboxsign", "Dropbox Sign",      "Developer-friendly. Simpler API. Lower cost at low volume."],
+              ].map(([val, label, desc]) => (
+                <div key={val} onClick={() => setEsign(e=>({...e,provider:val}))}
+                  style={{ display:"flex", gap:12, alignItems:"flex-start", padding:"12px 14px", borderRadius:9, border:`1.5px solid ${esign.provider===val?C.primary:C.border}`, background:esign.provider===val?C.primaryBg:"white", cursor:"pointer" }}>
+                  <div style={{ width:16, height:16, borderRadius:"50%", border:`2px solid ${esign.provider===val?C.primary:C.border}`, background:esign.provider===val?C.primary:"white", flexShrink:0, marginTop:1, display:"flex", alignItems:"center", justifyContent:"center" }}>
+                    {esign.provider===val && <div style={{ width:6, height:6, borderRadius:"50%", background:"white" }} />}
+                  </div>
+                  <div>
+                    <div style={{ fontSize:13, fontWeight:600, color:C.text }}>{label}</div>
+                    <div style={{ fontSize:12, color:C.muted }}>{desc}</div>
+                  </div>
                 </div>
+              ))}
+            </div>
+            {esign.provider !== "none" && (
+              <div style={{ display:"flex", flexDirection:"column", gap:10, padding:"14px", background:"#F8FAFC", borderRadius:9, border:`1px solid ${C.border}`, marginBottom:16 }}>
+                <div style={{ fontSize:12, fontWeight:600, color:C.text }}>{esign.provider === "docusign" ? "DocuSign" : "Dropbox Sign"} API credentials</div>
+                <div>
+                  <label style={{ display:"block", fontSize:11, fontWeight:600, color:C.muted, marginBottom:4, textTransform:"uppercase", letterSpacing:"0.05em" }}>API Key</label>
+                  <div style={{ display:"flex", gap:6 }}>
+                    <input type={showEsignKey?"text":"password"} value={esign.key} onChange={e => setEsign(s=>({...s,key:e.target.value}))} placeholder="Paste your API key"
+                      style={{ flex:1, padding:"7px 10px", borderRadius:7, border:`1px solid ${C.border}`, fontSize:13, outline:"none" }} />
+                    <button onClick={() => setShowEsignKey(v=>!v)} style={{ background:"none", border:`1px solid ${C.border}`, borderRadius:7, padding:"7px 10px", fontSize:11, color:C.muted, cursor:"pointer" }}>{showEsignKey?"Hide":"Show"}</button>
+                  </div>
+                </div>
+                <div>
+                  <label style={{ display:"block", fontSize:11, fontWeight:600, color:C.muted, marginBottom:4, textTransform:"uppercase", letterSpacing:"0.05em" }}>{esign.provider === "docusign" ? "Account ID / Secret" : "API Secret"}</label>
+                  <input type="password" value={esign.secret} onChange={e => setEsign(s=>({...s,secret:e.target.value}))} placeholder="Paste your secret"
+                    style={{ width:"100%", padding:"7px 10px", borderRadius:7, border:`1px solid ${C.border}`, fontSize:13, outline:"none", boxSizing:"border-box" }} />
+                </div>
+                <div style={{ fontSize:11, color:C.muted }}>{esign.provider === "docusign" ? "Find these in your DocuSign Developer account under Apps & Keys." : "Find these in your Dropbox Sign dashboard under API → API Key."}</div>
               </div>
-            ))}
-          </div>
-          <button onClick={saveRules} disabled={rulesSaving}
-            style={{ background:C.primary, color:"white", border:"none", borderRadius:8, padding:"8px 18px", fontSize:13, fontWeight:600, cursor:rulesSaving?"not-allowed":"pointer", opacity:rulesSaving?0.7:1 }}>
-            {rulesSaving ? "Saving…" : "Save Automation Rules"}
-          </button>
-        </Card>
+            )}
+            <button onClick={saveEsign} disabled={esignSaving}
+              style={{ background:C.primary, color:"white", border:"none", borderRadius:8, padding:"8px 18px", fontSize:13, fontWeight:600, cursor:esignSaving?"not-allowed":"pointer", opacity:esignSaving?0.7:1 }}>
+              {esignSaving ? "Saving…" : "Save E-signature Settings"}
+            </button>
+          </Card>
+        </div>
       )}
 
       {/* ── CLIENT PORTAL ── */}
