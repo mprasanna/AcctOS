@@ -612,7 +612,7 @@ function Dashboard({ clients, onSelect, setView, onAddClient }) {
         <div style={{ display:"flex", flexDirection:"column", gap:8, marginBottom:20 }}>
           {cnt.overdue>0 && <Alert color={C.red} bg={C.redBg} border="#FCA5A5"><strong>✕ {cnt.overdue} overdue</strong> — CRA deadline passed. File immediately to minimise penalties.</Alert>}
           {cnt.atrisk>0  && <Alert color={C.amber} bg={C.amberBg} border="#FCD34D"><strong>▲ {cnt.atrisk} at risk</strong> — will miss deadline if nothing changes today.</Alert>}
-          {soonAtRisk.length>0 && <Alert color={C.indigo} bg={C.indigoBg} border="#C7D2FE"><strong>🔮 {soonAtRisk.length} client{soonAtRisk.length>1?"s":""} will become At Risk within 5 days</strong> — {soonAtRisk.map(c=>c.name.split(" ")[0]).join(", ")}</Alert>}
+          {soonAtRisk.length>0 && <Alert color={C.indigo} bg={C.indigoBg} border="#C7D2FE"><strong>🔮 {soonAtRisk.length} client{soonAtRisk.length>1?"s":""} will become At Risk within 5 days</strong> — {soonAtRisk.map(c=>(c.name||"Client").split(" ")[0]).join(", ")}</Alert>}
         </div>
       )}
       {spotlights.length>0 && (
@@ -3162,7 +3162,7 @@ function MessagesTab({ client }) {
           <div style={{ textAlign:"center", padding:"32px", color:C.muted, fontSize:13 }}>Loading…</div>
         ) : messages.length === 0 ? (
           <div style={{ textAlign:"center", padding:"32px", color:C.muted, fontSize:13 }}>
-            No messages yet. When {client.name.split(" ")[0]} sends a message through their portal, it will appear here.
+            No messages yet. When {(client.name||"your client").split(" ")[0]} sends a message through their portal, it will appear here.
           </div>
         ) : messages.map(msg => {
           const isClient = msg.sender_type === "client";
@@ -3191,7 +3191,7 @@ function MessagesTab({ client }) {
         </div>
         <div style={{ display:"flex", gap:8 }}>
           <textarea value={body} onChange={e => setBody(e.target.value)}
-            placeholder={`Reply to ${client.name.split(" ")[0]}…`} rows={3}
+            placeholder={`Reply to ${(client.name||"client").split(" ")[0]}…`} rows={3}
             style={{ flex:1, padding:"9px 12px", borderRadius:8, border:`1px solid ${C.border}`, fontSize:13, resize:"vertical", outline:"none", fontFamily:"inherit" }} />
           <button onClick={sendReply} disabled={sending || !body.trim()}
             style={{ background:C.primary, color:"white", border:"none", borderRadius:8, padding:"10px 18px", fontSize:13, fontWeight:600, cursor:body.trim()&&!sending?"pointer":"not-allowed", opacity:sending?0.7:1, alignSelf:"flex-end" }}>
