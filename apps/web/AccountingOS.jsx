@@ -1818,6 +1818,7 @@ function IntegrationTab({ clientId, client }) {
   const [inviteEmail, setInviteEmail]     = useState("");
   const [sendingInvite, setSendingInvite] = useState(false);
   const [inviteMsg, setInviteMsg]         = useState(null);
+  const [setupLink, setSetupLink]         = useState(null); // shown when email fails
   const [revoking, setRevoking]           = useState(false);
 
   useEffect(() => {
@@ -1833,7 +1834,7 @@ function IntegrationTab({ clientId, client }) {
 
   async function sendInvite() {
     if (!inviteEmail.trim()) return;
-    setSendingInvite(true); setInviteMsg(null);
+    setSendingInvite(true); setInviteMsg(null); setSetupLink(null);
     try {
       const res = await fetch(`/api/clients/${clientId}/portal/invite`, {
         method:"POST", credentials:"include",
@@ -1843,7 +1844,13 @@ function IntegrationTab({ clientId, client }) {
       const data = await res.json();
       if (res.ok) {
         setPortalStatus(prev => ({...prev, pending_invite: data.invite}));
-        setInviteMsg({ ok:true, text:`Invite sent to ${inviteEmail}` });
+        if (data.email_sent === false) {
+          // Invite created but email failed — show the link so accountant can share manually
+          setSetupLink(data.setup_url);
+          setInviteMsg({ ok:false, text:`Email delivery failed — share the link below with ${inviteEmail} directly.` });
+        } else {
+          setInviteMsg({ ok:true, text:`Invite sent to ${inviteEmail}` });
+        }
       } else {
         setInviteMsg({ ok:false, text: data.error || "Failed to send invite." });
       }
@@ -1927,8 +1934,28 @@ function IntegrationTab({ clientId, client }) {
         </div>
 
         {inviteMsg && (
-          <div style={{ background:inviteMsg.ok?C.greenBg:C.redBg, border:`1px solid ${inviteMsg.ok?"#BBF7D0":"#FCA5A5"}`, borderRadius:8, padding:"8px 12px", fontSize:12, color:inviteMsg.ok?"#14532D":C.red, marginBottom:12 }}>
+          <div style={{ background:inviteMsg.ok?C.greenBg:C.redBg, border:`1px solid ${inviteMsg.ok?"#BBF7D0":"#FCA5A5"}`, borderRadius:8, padding:"8px 12px", fontSize:12, color:inviteMsg.ok?"#14532D":C.red, marginBottom:setupLink?8:12 }}>
             {inviteMsg.text}
+          </div>
+        )}
+
+        {/* Setup link fallback — shown when email delivery fails */}
+        {setupLink && (
+          <div style={{ background:"#FEFCE8", border:"1px solid #FDE68A", borderRadius:9, padding:"14px 16px", marginBottom:12 }}>
+            <div style={{ fontSize:12, fontWeight:600, color:"#92400E", marginBottom:6 }}>📋 Share this link with your client</div>
+            <div style={{ fontSize:11, color:"#78350F", marginBottom:10 }}>
+              Copy and send this to {inviteEmail} by email, WhatsApp, or however you normally communicate. It expires in 7 days.
+            </div>
+            <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+              <input readOnly value={setupLink}
+                style={{ flex:1, padding:"7px 10px", borderRadius:7, border:`1px solid #FCD34D`, fontSize:11, background:"white", color:"#1E293B", fontFamily:"monospace" }}
+                onFocus={e => e.target.select()}
+              />
+              <button onClick={() => { navigator.clipboard.writeText(setupLink); }}
+                style={{ background:"#F59E0B", color:"white", border:"none", borderRadius:7, padding:"7px 12px", fontSize:12, fontWeight:600, cursor:"pointer", whiteSpace:"nowrap" }}>
+                Copy
+              </button>
+            </div>
           </div>
         )}
 

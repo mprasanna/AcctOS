@@ -25,7 +25,7 @@ export async function POST(
   const { email } = body
   if (!email?.trim()) return err('email is required')
 
-  const { id: client_id } = params
+  const { client_id } = params
 
   // Verify client belongs to this firm
   const { data: client } = await supabase
@@ -83,7 +83,9 @@ export async function POST(
   // Send invite email via Resend
   try {
     await resend.emails.send({
-      from:    `${fromName} <noreply@${process.env.RESEND_DOMAIN ?? 'acct-os.com'}>`,
+      from:    process.env.RESEND_DOMAIN
+        ? `${fromName} <noreply@${process.env.RESEND_DOMAIN}>`
+        : `${fromName} <onboarding@resend.dev>`,
       to:      email.trim(),
       replyTo: settings?.reply_to_email ?? undefined,
       subject: `${firmName} has set up your secure accounting portal`,
