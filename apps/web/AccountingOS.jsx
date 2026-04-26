@@ -1,5 +1,5 @@
 "use client";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 
 // ─── DESIGN TOKENS ────────────────────────────────────────────────────────────
 const C = {
@@ -120,6 +120,7 @@ function useClients(refreshKey = 0) {
         if (!json.data) throw new Error("No data in response");
         const mapped = json.data.map(c => ({
           ...c,
+          name:           c.name ?? "Unknown Client",
           type:           c.client_type  ?? c.type,
           freq:           c.filing_freq  ?? c.freq,
           assigned:       c.assigned_to  ?? c.assigned,
@@ -254,9 +255,10 @@ function StatusBadge({ status, small }) {
 }
 
 function Avatar({ name, size=32 }) {
+  const safeName = name || "?";
   const p = [["#DBEAFE","#1D4ED8"],["#DCFCE7","#15803D"],["#FEF3C7","#B45309"],["#FCE7F3","#BE185D"],["#EDE9FE","#6D28D9"]];
-  const [bg, fg] = p[name.charCodeAt(0) % p.length];
-  const init = name.split(" ").map(w => w[0]).join("").slice(0,2).toUpperCase();
+  const [bg, fg] = p[safeName.charCodeAt(0) % p.length];
+  const init = safeName.split(" ").map(w => w[0]).join("").slice(0,2).toUpperCase();
   return <div style={{ width:size, height:size, borderRadius:"50%", background:bg, color:fg, display:"flex", alignItems:"center", justifyContent:"center", fontSize:size*0.35, fontWeight:600, flexShrink:0 }}>{init}</div>;
 }
 
@@ -521,8 +523,8 @@ function AddClientModal({ onClose, onSaved }) {
             </div>
             <div style={{ background:"#F0F9FF", border:"1px solid #BAE6FD", borderRadius:8, padding:"8px 12px", fontSize:11, color:"#0369A1" }}>
               💡 Stages, tasks, and document checklist will be auto-generated from the {wfForm.type} template for a {form.type}.
-              {FIELD_HELP[`wf_type_${wfForm.type.toLowerCase().replace("/","").replace(" ","_")}`] &&
-                <div style={{ marginTop:5, color:"#0369A1" }}>{FIELD_HELP[`wf_type_${wfForm.type.toLowerCase().replace("/","").replace(" ","_")}`]}</div>
+              {FIELD_HELP[`wf_type_${(wfForm.type||"").toLowerCase().replace("/","").replace(" ","_")}`] &&
+                <div style={{ marginTop:5, color:"#0369A1" }}>{FIELD_HELP[`wf_type_${(wfForm.type||"").toLowerCase().replace("/","").replace(" ","_")}`]}</div>
               }
             </div>
             <div style={{ display:"flex", justifyContent:"space-between", gap:8, marginTop:6 }}>
@@ -721,7 +723,7 @@ function Dashboard({ clients, onSelect, setView, onAddClient }) {
 function ClientList({ clients, onSelect }) {
   const [q, setQ] = useState("");
   const [f, setF] = useState("All");
-  const filtered = clients.filter(c => c.name.toLowerCase().includes(q.toLowerCase()) && (f==="All"||c.status===f));
+  const filtered = clients.filter(c => (c.name||"").toLowerCase().includes(q.toLowerCase()) && (f==="All"||c.status===f));
   const counts = {
     All: clients.length,
     "On Track": clients.filter(c => c.status==="On Track").length,
@@ -1678,19 +1680,27 @@ function ActivityTab({ clientId }) {
 
 // ─── INVOICES TAB ─────────────────────────────────────────────────────────────
 function InvoicesTab({ wf, client }) {
-  const [invoices, setInvoices]   = useState([]);
-  const [loading, setLoading]     = useState(true);
-  const [creating, setCreating]   = useState(false);
-  const [override, setOverride]   = useState("");
-  const [error, setError]         = useState(null);
-  const [success, setSuccess]     = useState(null);
+  const [invoices, setInvoices]         = useState([]);
+  const [loading, setLoading]           = useState(true);
+  const [creating, setCreating]         = useState(false);
+  const [override, setOverride]         = useState("");
+  const [error, setError]               = useState(null);
+  const [success, setSuccess]           = useState(null);
+  const [stripeConnected, setStripeConnected] = useState(null); // null=checking, true, false
 
   useEffect(() => {
     if (!wf?.id) return;
-    fetch(`/api/invoices?workflow_id=${wf.id}`, { credentials:"include" })
-      .then(r => r.ok ? r.json() : null)
-      .then(json => { if (json?.data) setInvoices(json.data); })
-      .finally(() => setLoading(false));
+    // Check Stripe Connect status + load invoices in parallel
+    Promise.all([
+      fetch(`/api/invoices?workflow_id=${wf.id}`, { credentials:"include" })
+        .then(r => r.ok ? r.json() : null),
+      fetch("/api/stripe/connect/status", { credentials:"include" })
+        .then(r => r.ok ? r.json() : null),
+    ]).then(([invoiceData, stripeData]) => {
+      if (invoiceData?.data) setInvoices(invoiceData.data);
+      setStripeConnected(stripeData?.connected === true);
+    }).catch(()=>{ setStripeConnected(false); })
+    .finally(() => setLoading(false));
   }, [wf?.id]);
 
   async function createInvoice() {
@@ -1726,24 +1736,50 @@ function InvoicesTab({ wf, client }) {
     <div>
       <div style={{ fontSize:13, fontWeight:600, color:C.text, marginBottom:14 }}>Invoices — {wf?.label}</div>
 
-      {/* Create invoice */}
-      <Card style={{ padding:"16px 18px", marginBottom:14 }}>
-        <div style={{ fontSize:13, fontWeight:500, color:C.text, marginBottom:8 }}>Create invoice for this workflow</div>
-        {error && <div style={{ background:C.redBg, border:"1px solid #FCA5A5", borderRadius:7, padding:"8px 12px", fontSize:12, color:C.red, marginBottom:10 }}>{error}</div>}
-        {success && <div style={{ background:C.greenBg, border:"1px solid #BBF7D0", borderRadius:7, padding:"8px 12px", fontSize:12, color:C.green, marginBottom:10 }}>✓ {success}</div>}
-        <div style={{ display:"flex", gap:8, alignItems:"center" }}>
-          <input type="number" min="0" step="0.01" placeholder="Amount (CAD) — leave blank to use rate from Settings"
-            value={override} onChange={e => setOverride(e.target.value)}
-            style={{ flex:1, padding:"7px 10px", borderRadius:7, border:`1px solid ${C.border}`, fontSize:13 }} />
-          <button onClick={createInvoice} disabled={creating}
-            style={{ background:C.primary, color:"white", border:"none", borderRadius:7, padding:"7px 16px", fontSize:13, fontWeight:600, cursor:"pointer", opacity:creating?0.7:1, whiteSpace:"nowrap" }}>
-            {creating ? "Sending…" : "Send Invoice →"}
+      {/* Stripe Connect check */}
+      {stripeConnected === false && (
+        <div style={{ background:C.amberBg, border:"1px solid #FCD34D", borderRadius:10, padding:"16px 18px", marginBottom:14 }}>
+          <div style={{ fontSize:13, fontWeight:600, color:"#92400E", marginBottom:4 }}>⚠ Stripe not connected</div>
+          <div style={{ fontSize:12, color:"#78350F", marginBottom:12 }}>
+            To send invoices to clients, connect a Stripe account first. Takes about 5 minutes.
+          </div>
+          <button
+            onClick={() => {
+              // Navigate to Settings → Billing tab
+              const evt = new CustomEvent("acct-os:navigate", { detail: { view:"settings", tab:"billing" } });
+              window.dispatchEvent(evt);
+            }}
+            style={{ background:"#F59E0B", color:"white", border:"none", borderRadius:8, padding:"7px 16px", fontSize:13, fontWeight:600, cursor:"pointer" }}>
+            Go to Settings → Billing →
           </button>
         </div>
-        <div style={{ fontSize:11, color:C.muted, marginTop:6 }}>
-          Default rates are set in Settings → Billing → Billing Rates. Invoice is sent via Stripe to the client email on file.
-        </div>
-      </Card>
+      )}
+
+      {/* Create invoice — only show if Stripe connected */}
+      {stripeConnected === true && (
+        <Card style={{ padding:"16px 18px", marginBottom:14 }}>
+          <div style={{ fontSize:13, fontWeight:500, color:C.text, marginBottom:8 }}>Create invoice for this workflow</div>
+          {error   && <div style={{ background:C.redBg,   border:"1px solid #FCA5A5", borderRadius:7, padding:"8px 12px", fontSize:12, color:C.red,   marginBottom:10 }}>{error}</div>}
+          {success && <div style={{ background:C.greenBg, border:"1px solid #BBF7D0", borderRadius:7, padding:"8px 12px", fontSize:12, color:C.green, marginBottom:10 }}>✓ {success}</div>}
+          <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+            <input type="number" min="0" step="0.01" placeholder="Amount (CAD) — leave blank to use rate from Settings"
+              value={override} onChange={e => setOverride(e.target.value)}
+              style={{ flex:1, padding:"7px 10px", borderRadius:7, border:`1px solid ${C.border}`, fontSize:13 }} />
+            <button onClick={createInvoice} disabled={creating}
+              style={{ background:C.primary, color:"white", border:"none", borderRadius:7, padding:"7px 16px", fontSize:13, fontWeight:600, cursor:"pointer", opacity:creating?0.7:1, whiteSpace:"nowrap" }}>
+              {creating ? "Sending…" : "Send Invoice →"}
+            </button>
+          </div>
+          <div style={{ fontSize:11, color:C.muted, marginTop:6 }}>
+            Default rates are set in Settings → Billing → Billing Rates. Invoice is sent via Stripe to the client email on file.
+          </div>
+        </Card>
+      )}
+
+      {/* Checking Stripe status */}
+      {stripeConnected === null && (
+        <div style={{ fontSize:12, color:C.muted, marginBottom:14 }}>Checking Stripe status…</div>
+      )}
 
       {/* Invoice history */}
       {loading ? (
@@ -3258,8 +3294,8 @@ function PortalSettingsTab() {
 }
 
 // ─── SETTINGS ────────────────────────────────────────────────────────────────
-function SettingsPage() {
-  const [activeTab, setActiveTab] = useState("firm");
+function SettingsPage({ initialTab = "firm" }) {
+  const [activeTab, setActiveTab] = useState(initialTab);
 
   // ── Firm profile state ───────────────────────────────────────────────────────
   const [firm, setFirm]       = useState({ name:"", email:"", province:"Ontario", bn:"" });
@@ -3796,11 +3832,22 @@ export default function App() {
   const [selected, setSelected] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [showAddClient, setShowAddClient] = useState(false);
+  const [settingsInitTab, setSettingsInitTab] = useState("firm");
   const { clients, loading, error } = useClients(refreshKey);
   const { count: unreadMsgs } = useUnreadMessages();
   const urgent = clients.filter(c => c.status==="At Risk"||c.status==="Overdue").length;
   const onRefresh = () => setRefreshKey(k => k + 1);
   const onAddClient = () => setShowAddClient(true);
+
+  // Listen for internal navigation events (e.g. InvoicesTab → Settings → Billing)
+  useEffect(() => {
+    function handleNavigate(e) {
+      if (e.detail?.view) { setView(e.detail.view); }
+      if (e.detail?.tab)  { setSettingsInitTab(e.detail.tab); }
+    }
+    window.addEventListener("acct-os:navigate", handleNavigate);
+    return () => window.removeEventListener("acct-os:navigate", handleNavigate);
+  }, []);
 
   const nav = [
     { id:"dashboard",    label:"Command Centre", icon:"⊞" },
@@ -3901,7 +3948,7 @@ export default function App() {
         {view==="templates"    && <WorkflowTemplates />}
         {view==="whyus"        && <WhyUsPage />}
         {view==="roadmap"      && <RoadmapPage />}
-        {view==="settings"     && <SettingsPage />}
+        {view==="settings"     && <SettingsPage initialTab={settingsInitTab} />}
       </div>
     </div>
     {showAddClient && (
