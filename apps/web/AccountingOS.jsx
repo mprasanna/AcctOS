@@ -151,7 +151,15 @@ function useClients(refreshKey = 0) {
           workflows: (c.workflows ?? []).map(wf => ({
             ...wf,
             stages:     (wf.stages ?? []).sort((a, b) => (a.n ?? 0) - (b.n ?? 0)),
-            tasks:      (wf.tasks ?? []).sort((a, b) => (a.stage_n ?? 0) - (b.stage_n ?? 0) || (a.sort_order ?? 0) - (b.sort_order ?? 0)),
+            tasks:      (wf.tasks ?? []).sort((a, b) => (a.stage_n ?? 0) - (b.stage_n ?? 0) || (a.sort_order ?? 0) - (b.sort_order ?? 0)).map(t => ({
+                          ...t,
+                          // Attach linked doc name for display in TasksTab
+                          linked_doc_name: t.task_id ? null : (() => {
+                            const docs = wf.documents ?? wf.docs ?? [];
+                            const linked = docs.find(d => d.task_id === t.id);
+                            return linked?.name ?? null;
+                          })(),
+                        })),
             docs:       wf.documents ?? wf.docs ?? [],
             stageNotes: wf.stage_notes ?? {},
             curStage:   wf.cur_stage   ?? 1,
@@ -1359,9 +1367,16 @@ function TasksTab({ wf, onRefresh }) {
                         <div style={{ fontSize:13, color:task.status==="complete"?C.muted:isLocked?C.muted:C.text, textDecoration:task.status==="complete"?"line-through":"none", fontWeight:task.status==="in_progress"?600:400 }}>
                           {task.title}
                         </div>
-                        <div style={{ fontSize:11, color:C.muted, marginTop:1, display:"flex", gap:10 }}>
+                        <div style={{ fontSize:11, color:C.muted, marginTop:1, display:"flex", gap:10, flexWrap:"wrap" }}>
                           <span>👤 {assignee}</span>
                           {(task.due_date||task.due) && <span>📅 {task.due_date||task.due}</span>}
+                          {/* Linked document badge */}
+                          {task.linked_doc_name && (
+                            <span style={{ color: task.status==="complete" ? C.green : C.primary, display:"flex", alignItems:"center", gap:3 }}>
+                              📄 {task.linked_doc_name}
+                              {task.status==="complete" && " · auto-completed"}
+                            </span>
+                          )}
                         </div>
                       </div>
 
@@ -1422,6 +1437,14 @@ function DocumentsTab({ wf, client, onRefresh }) {
           ? {...d, status:"received", uploaded_at: new Date().toLocaleDateString("en-CA",{month:"short",day:"numeric"}), upload_source:"Manual"}
           : d
         ));
+        // ── Auto-complete linked task when document is received ──
+        if (doc.task_id) {
+          await fetch(`/api/tasks/${doc.task_id}`, {
+            method:"PATCH", credentials:"include",
+            headers:{"Content-Type":"application/json"},
+            body: JSON.stringify({ status:"complete", auto_completed_by_doc: doc.id }),
+          }).catch(() => {}); // non-critical — don't block on task update
+        }
         if (onRefresh) onRefresh();
       }
     } finally { setSaving(null); }
@@ -1442,6 +1465,14 @@ function DocumentsTab({ wf, client, onRefresh }) {
           ? {...d, status:"received", uploaded_at: new Date().toLocaleDateString("en-CA",{month:"short",day:"numeric"}), upload_source:"Firm upload"}
           : d
         ));
+        // ── Auto-complete linked task when document is uploaded ──
+        if (doc.task_id) {
+          await fetch(`/api/tasks/${doc.task_id}`, {
+            method:"PATCH", credentials:"include",
+            headers:{"Content-Type":"application/json"},
+            body: JSON.stringify({ status:"complete", auto_completed_by_doc: doc.id }),
+          }).catch(() => {});
+        }
         if (onRefresh) onRefresh();
       }
     } finally { setUploading(null); }
@@ -1481,14 +1512,24 @@ function DocumentsTab({ wf, client, onRefresh }) {
         ? <div style={{ background:C.amberBg, border:`1px solid #FCD34D`, borderRadius:8, padding:"16px", fontSize:12, color:C.amber }}>⚠ No documents loaded from database for this workflow.</div>
         : (
           <Card>
-            {docs.map((doc, i) => (
+            {docs.map((doc, i) => {
+              // Find linked task name for this doc
+              const linkedTask = doc.task_id
+                ? (wf.tasks || []).find(t => t.id === doc.task_id)
+                : null;
+              return (
               <div key={doc.id || i} style={{ padding:"10px 16px", borderBottom:i<docs.length-1?`1px solid ${C.border}`:"none" }}>
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
                   <div style={{ flex:1 }}>
-                    <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                    <div style={{ display:"flex", alignItems:"center", gap:6, flexWrap:"wrap" }}>
                       <div style={{ fontSize:13, color:C.text, fontWeight:500 }}>{doc.name}</div>
                       {doc.is_t183 && <span style={{ fontSize:10, fontWeight:700, background:"#DBEAFE", color:"#1D4ED8", borderRadius:4, padding:"1px 6px" }}>T183</span>}
                       {doc.upload_required && doc.status!=="received" && <span style={{ fontSize:10, fontWeight:700, background:"#FEF3C7", color:"#B45309", borderRadius:4, padding:"1px 6px" }}>Upload required</span>}
+                      {linkedTask && (
+                        <span style={{ fontSize:10, fontWeight:500, background:"#F0FDF4", color:C.green, border:`1px solid #BBF7D0`, borderRadius:4, padding:"1px 7px", display:"flex", alignItems:"center", gap:3 }}>
+                          ⚡ Auto-completes: {linkedTask.title || linkedTask.description}
+                        </span>
+                      )}
                     </div>
                     <div style={{ fontSize:11, color:C.muted, marginTop:1 }}>
                       {doc.status==="received"
@@ -1515,7 +1556,8 @@ function DocumentsTab({ wf, client, onRefresh }) {
                   </div>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </Card>
         )
       }
@@ -3307,6 +3349,32 @@ function PortalSettingsTab() {
             <div style={{ background:C.primary, color:"white", borderRadius:7, padding:"8px", fontSize:12, fontWeight:600 }}>Sign in</div>
             <div style={{ fontSize:9, color:C.slate, marginTop:10 }}>Secured by AcctOS</div>
           </div>
+        </div>
+      </Card>
+
+      {/* ── Portal URL ── */}
+      <Card style={{ padding:"18px 24px" }}>
+        <div style={{ fontSize:13, fontWeight:600, color:C.text, marginBottom:4 }}>Portal login URL</div>
+        <div style={{ fontSize:12, color:C.muted, marginBottom:12 }}>
+          Share this URL with any client who already has a portal account. They use the email and password they set up when they accepted the invite.
+        </div>
+        <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+          <input readOnly
+            value={`${typeof window !== "undefined" ? window.location.origin : "https://acct-os.vercel.app"}/portal/login`}
+            style={{ flex:1, padding:"8px 12px", borderRadius:8, border:`1px solid ${C.border}`, fontSize:13, background:"#F8FAFC", color:C.text, fontFamily:"monospace" }}
+            onFocus={e => e.target.select()}
+          />
+          <button
+            onClick={() => {
+              const url = `${window.location.origin}/portal/login`;
+              navigator.clipboard.writeText(url);
+            }}
+            style={{ background:C.primary, color:"white", border:"none", borderRadius:8, padding:"8px 16px", fontSize:13, fontWeight:600, cursor:"pointer", whiteSpace:"nowrap" }}>
+            Copy
+          </button>
+        </div>
+        <div style={{ fontSize:11, color:C.muted, marginTop:8 }}>
+          To send a new invite to a client who doesn't have an account yet, use the Integration tab in their client workspace.
         </div>
       </Card>
 
