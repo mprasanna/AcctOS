@@ -5,13 +5,15 @@
 
 import { NextRequest } from 'next/server'
 import { getFirmUser, getAdminClient, err, ok } from '@/lib/portal-auth'
-import { Resend } from 'resend'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+// NOTE: Resend is imported dynamically inside the handler.
+// Do NOT move it to module scope — Next.js executes modules at build time
+// when collecting page data, and the RESEND_API_KEY env var is not available
+// at build time, causing `new Resend(undefined)` to throw and fail the build.
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { client_id: string } }
+  { params }: { params: { id: string } }
 ) {
   const { supabase, firmUser, error } = await getFirmUser(req)
   if (error) return err(error, 401)
@@ -25,7 +27,7 @@ export async function POST(
   const { email } = body
   if (!email?.trim()) return err('email is required')
 
-  const { client_id } = params
+  const { id: client_id } = params
 
   // Verify client belongs to this firm
   const { data: client } = await supabase
@@ -80,7 +82,9 @@ export async function POST(
   const tagline  = settings?.portal_tagline ?? 'Your secure accounting portal'
   const fromName = settings?.from_name ?? firmName
 
-  // Send invite email via Resend
+  // Dynamic import — avoids top-level Resend instantiation which fails at build time
+  const { Resend } = await import('resend')
+  const resend = new Resend(process.env.RESEND_API_KEY)
   try {
     await resend.emails.send({
       from:    process.env.RESEND_DOMAIN
