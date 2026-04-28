@@ -3,13 +3,25 @@ import { useState, useMemo, useEffect, useRef } from "react";
 
 // ─── DESIGN TOKENS ────────────────────────────────────────────────────────────
 const C = {
-  bg: "#F8FAFC", card: "#FFFFFF", border: "#E2E8F0",
+  // Backgrounds
+  bg: "#F8FAFC", card: "#FFFFFF", border: "#E8ECF0",
+
+  // Primary — used sparingly, only for interactive elements and key accents
   primary: "#2563EB", primaryBg: "#EFF6FF",
-  green: "#16A34A",  greenBg:  "#DCFCE7",
-  amber: "#F59E0B",  amberBg:  "#FEF3C7",
-  red:   "#DC2626",  redBg:    "#FEE2E2",
-  indigo: "#4F46E5", indigoBg: "#EEF2FF",
-  text: "#0F172A", muted: "#475569", slate: "#94A3B8",
+
+  // Status — muted versions, not screaming
+  green:  "#16A34A",  greenBg:  "#F0FDF4",   // softer green bg
+  amber:  "#B45309",  amberBg:  "#FFFBEB",   // darker amber text, softer bg
+  red:    "#DC2626",  redBg:    "#FFF5F5",   // softer red bg
+  indigo: "#4F46E5",  indigoBg: "#F5F3FF",
+
+  // Typography — tighter hierarchy
+  text:   "#0F172A",  // headings, important values
+  muted:  "#64748B",  // secondary text
+  slate:  "#94A3B8",  // tertiary, placeholders
+
+  // Neutral status chips (replaces coloured pills for most statuses)
+  chip: "#F1F5F9", chipText: "#475569",
 };
 
 const TODAY = new Date();
@@ -256,18 +268,23 @@ const STATUS_CFG = {
 function StatusBadge({ status, small }) {
   const cfg = STATUS_CFG[status] || { color: C.slate, bg: "#F1F5F9", icon: "○" };
   return (
-    <span style={{ display:"inline-flex", alignItems:"center", gap:5, background:cfg.bg, color:cfg.color, padding: small ? "2px 8px" : "4px 12px", borderRadius:20, fontSize: small ? 11 : 12, fontWeight:600 }}>
-      <span style={{ fontSize: small ? 8 : 9 }}>{cfg.icon}</span>{status}
+    <span style={{
+      display:"inline-flex", alignItems:"center", gap:4,
+      background: cfg.bg, color: cfg.color,
+      padding: small ? "2px 8px" : "3px 10px",
+      borderRadius: 6,
+      fontSize: small ? 11 : 12, fontWeight: 500,
+    }}>
+      <span style={{ fontSize: small ? 7 : 8, lineHeight:1 }}>{cfg.icon}</span>{status}
     </span>
   );
 }
 
-function Avatar({ name, size=32 }) {
+function Avatar({ name, size=28 }) {
   const safeName = name || "?";
-  const p = [["#DBEAFE","#1D4ED8"],["#DCFCE7","#15803D"],["#FEF3C7","#B45309"],["#FCE7F3","#BE185D"],["#EDE9FE","#6D28D9"]];
-  const [bg, fg] = p[safeName.charCodeAt(0) % p.length];
+  // Neutral avatars — grey background, dark text
   const init = safeName.split(" ").map(w => w[0]).join("").slice(0,2).toUpperCase();
-  return <div style={{ width:size, height:size, borderRadius:"50%", background:bg, color:fg, display:"flex", alignItems:"center", justifyContent:"center", fontSize:size*0.35, fontWeight:600, flexShrink:0 }}>{init}</div>;
+  return <div style={{ width:size, height:size, borderRadius:"50%", background:"#E2E8F0", color:C.text, display:"flex", alignItems:"center", justifyContent:"center", fontSize:size*0.35, fontWeight:600, flexShrink:0 }}>{init}</div>;
 }
 
 function StageBar({ stages }) {
@@ -285,23 +302,47 @@ function StageBar({ stages }) {
 }
 
 function Pill({ label, bg, color }) {
-  return <span style={{ background:bg, color, fontSize:11, fontWeight:600, padding:"2px 9px", borderRadius:20 }}>{label}</span>;
+  // Default to neutral chip if no explicit colour passed
+  const bg_  = bg    || C.chip;
+  const col_ = color || C.chipText;
+  return (
+    <span style={{
+      background: bg_, color: col_,
+      fontSize: 11, fontWeight: 500,
+      padding: "2px 8px", borderRadius: 6,
+      display: "inline-block", lineHeight: "16px",
+    }}>{label}</span>
+  );
 }
 
 function Card({ children, style={} }) {
-  return <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:12, ...style }}>{children}</div>;
+  return (
+    <div style={{
+      background: C.card,
+      border: `1px solid ${C.border}`,
+      borderRadius: 10,
+      ...style,
+    }}>{children}</div>
+  );
 }
 
 function Alert({ children, color, bg, border }) {
-  return <div style={{ background:bg, border:`1px solid ${border}`, borderRadius:8, padding:"10px 16px", fontSize:13, color, display:"flex", alignItems:"flex-start", gap:8 }}>{children}</div>;
+  return (
+    <div style={{
+      background: bg, border: `1px solid ${border}`,
+      borderRadius: 8, padding: "9px 14px",
+      fontSize: 13, color,
+      display: "flex", alignItems: "flex-start", gap: 8,
+    }}>{children}</div>
+  );
 }
 
 function SectionHead({ title, sub, action }) {
   return (
     <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20 }}>
       <div>
-        <h1 style={{ fontSize:20, fontWeight:700, color:C.text, margin:0 }}>{title}</h1>
-        {sub && <p style={{ color:C.muted, fontSize:13, margin:"3px 0 0" }}>{sub}</p>}
+        <h1 style={{ fontSize:18, fontWeight:600, color:C.text, margin:0, letterSpacing:"-0.01em" }}>{title}</h1>
+        {sub && <p style={{ color:C.muted, fontSize:13, margin:"3px 0 0", fontWeight:400 }}>{sub}</p>}
       </div>
       {action && <div style={{ display:"flex", gap:8 }}>{action}</div>}
     </div>
@@ -312,7 +353,12 @@ function Btn({ children, variant="outline", onClick, disabled }) {
   const s = variant==="primary"
     ? { background:C.primary, color:"white", border:"none", opacity:disabled?.5:1, cursor:disabled?"not-allowed":"pointer" }
     : { background:"white", color:C.text, border:`1px solid ${C.border}`, cursor:"pointer" };
-  return <button onClick={onClick} disabled={disabled} style={{ ...s, borderRadius:8, padding:"7px 14px", fontSize:13, fontWeight:500 }}>{children}</button>;
+  return (
+    <button onClick={onClick} disabled={disabled}
+      style={{ ...s, borderRadius:8, padding:"7px 14px", fontSize:13, fontWeight:500, lineHeight:"20px" }}>
+      {children}
+    </button>
+  );
 }
 
 function RuleRow({ icon, text, color }) {
@@ -573,10 +619,10 @@ function Dashboard({ clients, onSelect, setView, onAddClient }) {
   const spotlights = filteredClients.filter(c => c.status !== "Complete").slice(0,3);
   const soonAtRisk = filteredClients.filter(c => c.status==="On Track" && c.daysToDeadline!=null && c.daysToDeadline<=5 && c.daysToDeadline>=0);
   const tiles = [
-    { label:"Active Filings", value:cnt.all-cnt.complete, color:C.primary, bg:C.primaryBg },
-    { label:"On Track",       value:cnt.ontrack,  color:C.green, bg:C.greenBg },
-    { label:"At Risk",        value:cnt.atrisk,   color:C.amber, bg:C.amberBg },
-    { label:"Overdue",        value:cnt.overdue,  color:C.red,   bg:C.redBg },
+    { label:"Active Filings", value:cnt.all-cnt.complete, color:C.text,   bg:"#F8FAFC", border:C.border },
+    { label:"On Track",       value:cnt.ontrack,  color:C.green, bg:C.greenBg, border:"#BBF7D0" },
+    { label:"At Risk",        value:cnt.atrisk,   color:C.amber, bg:C.amberBg, border:"#FDE68A" },
+    { label:"Overdue",        value:cnt.overdue,  color:C.red,   bg:C.redBg,   border:"#FECACA" },
   ];
 
   return (
@@ -584,84 +630,104 @@ function Dashboard({ clients, onSelect, setView, onAddClient }) {
       <SectionHead title="Command Centre" sub={`${new Date().toLocaleDateString("en-CA",{month:"long",year:"numeric"})} · ${cnt.all} active clients · Ontario (CRA timezone)`}
         action={<>
           <button onClick={onAddClient}
-            style={{ background:C.green, color:"white", border:"none", borderRadius:8, padding:"7px 14px", fontSize:13, fontWeight:600, cursor:"pointer" }}>
+            style={{ background:C.primary, color:"white", border:"none", borderRadius:8, padding:"7px 16px", fontSize:13, fontWeight:500, cursor:"pointer" }}>
             + Add Client
           </button>
-          <Btn onClick={() => setView("deadlines")}>📅 Deadlines</Btn>
-          <Btn onClick={() => setView("allworkflows")}>⚡ All Workflows</Btn>
+          <Btn onClick={() => setView("deadlines")}>Deadlines</Btn>
+          <Btn onClick={() => setView("allworkflows")}>All Workflows</Btn>
           <Btn variant="primary" onClick={() => setView("clients")}>All Clients →</Btn>
         </>}
       />
-      {/* Workflow type filter tabs */}
+
+      {/* Workflow type filter */}
       {allWfTypes.length > 2 && (
         <div style={{ display:"flex", gap:6, marginBottom:16, flexWrap:"wrap" }}>
           {allWfTypes.map(t => (
             <button key={t} onClick={() => setWfTypeFilter(t)}
-              style={{ padding:"5px 14px", borderRadius:20, border:`1px solid ${wfTypeFilter===t?C.primary:C.border}`, background:wfTypeFilter===t?C.primary:"white", color:wfTypeFilter===t?"white":C.text, fontSize:12, fontWeight:wfTypeFilter===t?600:400, cursor:"pointer" }}>
+              style={{ padding:"4px 12px", borderRadius:6, border:`1px solid ${wfTypeFilter===t?C.primary:C.border}`, background:wfTypeFilter===t?C.primary:"white", color:wfTypeFilter===t?"white":C.muted, fontSize:12, fontWeight:wfTypeFilter===t?500:400, cursor:"pointer" }}>
               {t}
-              {t !== "All" && (
-                <span style={{ marginLeft:5, background:wfTypeFilter===t?"rgba(255,255,255,0.25)":C.primaryBg, color:wfTypeFilter===t?"white":C.primary, fontSize:10, fontWeight:700, padding:"1px 5px", borderRadius:8 }}>
-                  {clients.filter(c=>(c.workflows||[]).some(w=>w.type===t)).length}
-                </span>
-              )}
+              {t !== "All" && <span style={{ marginLeft:5, opacity:0.7, fontSize:11 }}>{clients.filter(c=>(c.workflows||[]).some(w=>w.type===t)).length}</span>}
             </button>
           ))}
         </div>
       )}
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:12, marginBottom:20 }}>
+
+      {/* Stat tiles — clean, minimal colour */}
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:10, marginBottom:16 }}>
         {tiles.map(t => (
-          <div key={t.label} style={{ background:t.bg, borderRadius:12, padding:"16px 20px", border:`1px solid ${t.color}22` }}>
-            <div style={{ fontSize:12, color:t.color, fontWeight:600, marginBottom:3 }}>{t.label}</div>
-            <div style={{ fontSize:32, fontWeight:700, color:t.color, lineHeight:1 }}>{t.value}</div>
+          <div key={t.label} style={{ background:t.bg, borderRadius:10, padding:"16px 18px", border:`1px solid ${t.border}` }}>
+            <div style={{ fontSize:11, color:C.muted, fontWeight:500, marginBottom:6, textTransform:"uppercase", letterSpacing:"0.04em" }}>{t.label}</div>
+            <div style={{ fontSize:30, fontWeight:700, color:t.color, lineHeight:1 }}>{t.value}</div>
           </div>
         ))}
       </div>
+
+      {/* Alert banners — minimal, text-forward */}
       {(cnt.overdue>0||cnt.atrisk>0||soonAtRisk.length>0) && (
-        <div style={{ display:"flex", flexDirection:"column", gap:8, marginBottom:20 }}>
-          {cnt.overdue>0 && <Alert color={C.red} bg={C.redBg} border="#FCA5A5"><strong>✕ {cnt.overdue} overdue</strong> — CRA deadline passed. File immediately to minimise penalties.</Alert>}
-          {cnt.atrisk>0  && <Alert color={C.amber} bg={C.amberBg} border="#FCD34D"><strong>▲ {cnt.atrisk} at risk</strong> — will miss deadline if nothing changes today.</Alert>}
-          {soonAtRisk.length>0 && <Alert color={C.indigo} bg={C.indigoBg} border="#C7D2FE"><strong>🔮 {soonAtRisk.length} client{soonAtRisk.length>1?"s":""} will become At Risk within 5 days</strong> — {soonAtRisk.map(c=>(c.name||"Client").split(" ")[0]).join(", ")}</Alert>}
+        <div style={{ display:"flex", flexDirection:"column", gap:6, marginBottom:16 }}>
+          {cnt.overdue>0 && (
+            <div style={{ background:C.redBg, border:`1px solid #FECACA`, borderRadius:8, padding:"9px 14px", fontSize:13, color:C.red, display:"flex", alignItems:"center", gap:8 }}>
+              <span style={{ fontWeight:600 }}>✕ {cnt.overdue} overdue</span>
+              <span style={{ color:C.muted, fontWeight:400 }}>— CRA deadline passed. File immediately to minimise penalties.</span>
+            </div>
+          )}
+          {cnt.atrisk>0 && (
+            <div style={{ background:C.amberBg, border:`1px solid #FDE68A`, borderRadius:8, padding:"9px 14px", fontSize:13, color:C.amber, display:"flex", alignItems:"center", gap:8 }}>
+              <span style={{ fontWeight:600 }}>▲ {cnt.atrisk} at risk</span>
+              <span style={{ color:C.muted, fontWeight:400 }}>— will miss deadline if nothing changes today.</span>
+            </div>
+          )}
+          {soonAtRisk.length>0 && (
+            <div style={{ background:"#F8FAFC", border:`1px solid ${C.border}`, borderRadius:8, padding:"9px 14px", fontSize:13, color:C.muted, display:"flex", alignItems:"center", gap:8 }}>
+              <span style={{ fontWeight:500, color:C.text }}>🔮 {soonAtRisk.length} approaching risk</span>
+              <span>— {soonAtRisk.map(c=>(c.name||"Client").split(" ")[0]).join(", ")} within 5 days</span>
+            </div>
+          )}
         </div>
       )}
+
+      {/* Spotlight cards */}
       {spotlights.length>0 && (
         <div style={{ marginBottom:20 }}>
-          <div style={{ fontSize:12, fontWeight:600, color:C.muted, marginBottom:10, textTransform:"uppercase", letterSpacing:"0.05em" }}>This Week · Highest Priority</div>
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:12 }}>
+          <div style={{ fontSize:11, fontWeight:600, color:C.slate, marginBottom:10, textTransform:"uppercase", letterSpacing:"0.06em" }}>This Week · Highest Priority</div>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:10 }}>
             {spotlights.map(cl => {
-              const wf = cl.activeWf;
+              const wf  = cl.activeWf;
               const cfg = STATUS_CFG[cl.status]||STATUS_CFG["On Track"];
               return (
                 <div key={cl.id} onClick={() => onSelect(cl)}
-                  style={{ background:"white", border:`2px solid ${cfg.color}33`, borderRadius:10, padding:"14px 16px", cursor:"pointer" }}
-                  onMouseEnter={e => e.currentTarget.style.borderColor=cfg.color}
-                  onMouseLeave={e => e.currentTarget.style.borderColor=cfg.color+"33"}
+                  style={{ background:"white", border:`1px solid ${C.border}`, borderRadius:10, padding:"14px 16px", cursor:"pointer" }}
+                  onMouseEnter={e => e.currentTarget.style.borderColor=C.primary}
+                  onMouseLeave={e => e.currentTarget.style.borderColor=C.border}
                 >
                   <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:8 }}>
                     <div style={{ fontSize:13, fontWeight:600, color:C.text }}>{cl.name}</div>
                     <StatusBadge status={cl.status} small />
                   </div>
-                  {wf && <div style={{ fontSize:11, color:C.muted, marginBottom:6 }}>{wf.label}</div>}
+                  {wf && <div style={{ fontSize:11, color:C.muted, marginBottom:8 }}>{wf.label}</div>}
                   {wf && wf.stages && <StageBar stages={wf.stages} />}
-                  <div style={{ fontSize:11, marginTop:6, color:cl.daysToDeadline<0?C.red:cl.daysToDeadline<=5?C.amber:C.muted }}>
+                  <div style={{ fontSize:11, marginTop:8, color:cl.daysToDeadline<0?C.red:cl.daysToDeadline<=5?C.amber:C.muted }}>
                     {cl.daysToDeadline<0?`${Math.abs(cl.daysToDeadline)}d overdue`:`${cl.daysToDeadline}d to deadline`}
                   </div>
-                  {cl.flags?.length>0 && <div style={{ fontSize:11, color:cfg.color, marginTop:4 }}>⚑ {cl.flags[0].replace(/^C\d: /,"")}</div>}
+                  {cl.flags?.length>0 && <div style={{ fontSize:11, color:C.muted, marginTop:3 }}>⚑ {cl.flags[0].replace(/^C\d: /,"")}</div>}
                 </div>
               );
             })}
           </div>
         </div>
       )}
+
+      {/* Client ledger table */}
       <Card>
-        <div style={{ padding:"12px 20px", borderBottom:`1px solid ${C.border}`, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+        <div style={{ padding:"12px 18px", borderBottom:`1px solid ${C.border}`, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
           <span style={{ fontSize:13, fontWeight:600, color:C.text }}>Active Client Ledger</span>
-          <span style={{ fontSize:11, color:C.muted }}>Sorted by risk score · highest first</span>
+          <span style={{ fontSize:11, color:C.slate }}>Sorted by risk score · highest first</span>
         </div>
         <table style={{ width:"100%", borderCollapse:"collapse" }}>
           <thead>
-            <tr style={{ background:"#F8FAFC" }}>
+            <tr>
               {["Client","Workflows","Worst Stage","Status","Deadline","Risk Flag","Accountant"].map(h => (
-                <th key={h} style={{ padding:"8px 14px", textAlign:"left", fontSize:11, fontWeight:600, color:C.muted, textTransform:"uppercase", letterSpacing:"0.05em", borderBottom:`1px solid ${C.border}` }}>{h}</th>
+                <th key={h} style={{ padding:"8px 14px", textAlign:"left", fontSize:11, fontWeight:500, color:C.slate, textTransform:"uppercase", letterSpacing:"0.05em", borderBottom:`1px solid ${C.border}`, background:"#FAFAFA" }}>{h}</th>
               ))}
             </tr>
           </thead>
@@ -671,12 +737,12 @@ function Dashboard({ clients, onSelect, setView, onAddClient }) {
               const u  = cl.assigned_user;
               return (
                 <tr key={cl.id} onClick={() => onSelect(cl)}
-                  style={{ background:i%2===0?"white":"#FAFAFA", cursor:"pointer" }}
-                  onMouseEnter={e => e.currentTarget.style.background=C.primaryBg}
-                  onMouseLeave={e => e.currentTarget.style.background=i%2===0?"white":"#FAFAFA"}
+                  style={{ background:"white", cursor:"pointer", borderBottom:`1px solid ${C.border}` }}
+                  onMouseEnter={e => e.currentTarget.style.background="#F8FAFC"}
+                  onMouseLeave={e => e.currentTarget.style.background="white"}
                 >
                   <td style={{ padding:"11px 14px" }}>
-                    <div style={{ fontWeight:600, fontSize:13, color:C.text }}>{cl.name}</div>
+                    <div style={{ fontWeight:500, fontSize:13, color:C.text }}>{cl.name}</div>
                     <div style={{ fontSize:11, color:C.muted }}>{cl.city} · {cl.type}</div>
                   </td>
                   <td style={{ padding:"11px 14px" }}>
@@ -3946,13 +4012,13 @@ export default function App() {
 
   const nav = [
     { id:"dashboard",    label:"Command Centre", icon:"⊞" },
-    { id:"clients",      label:"Clients",        icon:"👥" },
-    { id:"messages",     label:"Messages",       icon:"💬" },
-    { id:"allworkflows", label:"Workflows",      icon:"⚡" },
-    { id:"deadlines",    label:"Deadlines",      icon:"📅" },
-    { id:"templates",    label:"Templates",      icon:"🗂" },
-    { id:"whyus",        label:"Why Us",         icon:"⚔️" },
-    { id:"roadmap",      label:"Roadmap",        icon:"📍" },
+    { id:"clients",      label:"Clients",        icon:"○○" },
+    { id:"messages",     label:"Messages",       icon:"✉" },
+    { id:"allworkflows", label:"Workflows",      icon:"≡" },
+    { id:"deadlines",    label:"Deadlines",      icon:"◫" },
+    { id:"templates",    label:"Templates",      icon:"⊟" },
+    { id:"whyus",        label:"Why Us",         icon:"★" },
+    { id:"roadmap",      label:"Roadmap",        icon:"→" },
     { id:"settings",     label:"Settings",       icon:"⚙" },
   ];
 
@@ -4000,17 +4066,17 @@ export default function App() {
             const active = view===item.id||(item.id==="clients"&&view==="client");
             return (
               <button key={item.id} onClick={() => { setView(item.id); setSelected(null); }}
-                style={{ display:"flex", alignItems:"center", gap:9, width:"100%", padding:"7px 10px", borderRadius:7, border:"none", cursor:"pointer", textAlign:"left", background:active?C.primaryBg:"none", color:active?C.primary:C.text, fontSize:13, fontWeight:active?600:400, marginBottom:1 }}
-                onMouseEnter={e => { if(!active) e.currentTarget.style.background="#F8FAFC"; }}
-                onMouseLeave={e => { if(!active) e.currentTarget.style.background="none"; }}
+                style={{ display:"flex", alignItems:"center", gap:9, width:"100%", padding:"7px 10px", borderRadius:7, border:"none", cursor:"pointer", textAlign:"left", background:active?"#F1F5F9":"none", color:active?C.text:C.muted, fontSize:13, fontWeight:active?600:400, marginBottom:1 }}
+                onMouseEnter={e => { if(!active) e.currentTarget.style.background="#F8FAFC"; e.currentTarget.style.color=C.text; }}
+                onMouseLeave={e => { if(!active) e.currentTarget.style.background="none"; e.currentTarget.style.color=C.muted; }}
               >
-                <span style={{ fontSize:13 }}>{item.icon}</span>
+                <span style={{ fontSize:12, width:16, textAlign:"center", flexShrink:0 }}>{item.icon}</span>
                 <span style={{ flex:1 }}>{item.label}</span>
                 {item.id==="dashboard"&&urgent>0 && (
-                  <span style={{ background:C.red, color:"white", fontSize:10, fontWeight:700, padding:"1px 6px", borderRadius:10 }}>{urgent}</span>
+                  <span style={{ background:C.red, color:"white", fontSize:10, fontWeight:600, padding:"1px 6px", borderRadius:10, minWidth:16, textAlign:"center" }}>{urgent}</span>
                 )}
                 {item.id==="messages"&&unreadMsgs>0 && (
-                  <span style={{ background:C.primary, color:"white", fontSize:10, fontWeight:700, padding:"1px 6px", borderRadius:10 }}>{unreadMsgs}</span>
+                  <span style={{ background:C.primary, color:"white", fontSize:10, fontWeight:600, padding:"1px 6px", borderRadius:10, minWidth:16, textAlign:"center" }}>{unreadMsgs}</span>
                 )}
               </button>
             );
